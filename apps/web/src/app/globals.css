@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    /* 👇 Forces Western numerals (1, 2, 3) for ALL text */
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+  
+  body {
+    @apply antialiased;
+  }
+
+  /* 👇 Target RTL/Arabic elements specifically to be safe */
+  [dir="rtl"], [lang="ar"] {
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+}
