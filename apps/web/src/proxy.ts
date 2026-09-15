@@ -9,38 +9,30 @@ const nonLocalizedRoutes = ['/admin', '/api', '/_next', '/favicon.ico', '/images
 export default function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Skip non-localized routes
+  // 1. Skip non-localized routes
   if (nonLocalizedRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next();
   }
 
-  // Skip static files
+  // 2. Skip static files
   if (/\.(png|jpg|jpeg|svg|gif|webp|ico|css|js|woff|woff2|ttf|otf|map)$/i.test(pathname)) {
     return NextResponse.next();
   }
 
-  // Check for locale prefix
+  // 3. Check for locale prefix
   const pathnameLocale = locales.find(
     (locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`)
   );
 
-  // Has default locale prefix → strip it
-  if (pathnameLocale === defaultLocale) {
-    const stripped = pathname.replace(`/${defaultLocale}`, '') || '/';
-    const url = request.nextUrl.clone();
-    url.pathname = stripped;
-    return NextResponse.redirect(url);
-  }
-
-  // Has non-default locale → pass through
+  // 4. If URL already has a locale (sv, ar, en, fr) → serve it directly
   if (pathnameLocale) {
     return NextResponse.next();
   }
 
-  // No locale → rewrite to default
+  // 5. No locale → redirect to default locale
   const url = request.nextUrl.clone();
-  url.pathname = `/${defaultLocale}${pathname}`;
-  return NextResponse.rewrite(url);
+  url.pathname = `/${defaultLocale}${pathname === '/' ? '' : pathname}`;
+  return NextResponse.redirect(url);
 }
 
 export const config = {
