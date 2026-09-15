@@ -6,7 +6,7 @@ const defaultLocale = 'sv';
 
 const nonLocalizedRoutes = ['/admin', '/api', '/_next', '/favicon.ico', '/images', '/member'];
 
-export default function proxy(request: NextRequest) {
+export default function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // 1. Skip non-localized routes
