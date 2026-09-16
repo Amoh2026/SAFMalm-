@@ -80,17 +80,17 @@ export function Navbar() {
               className="h-9 sm:h-10 w-auto shrink-0"
             />
             <div className="hidden lg:block leading-tight">
-              <span className="text-white font-bold text-base xl:text-lg whitespace-nowrap">
-                Svensk Algeriska Föreningen
+              <span className="text-white font-bold text-sm xl:text-base 2xl:text-lg whitespace-nowrap">
+                Svensk Algeriska Föreningen i Malmö
               </span>
               <span
-                className="text-yellow-400 text-xs block whitespace-nowrap"
+                className="text-yellow-400 text-[10px] xl:text-xs block whitespace-nowrap"
                 style={{
                   fontFamily:
                     '"Traditional Arabic", "Arabic Typesetting", Arial, sans-serif',
                 }}
               >
-                الجمعية الجزائرية السويدية
+                الجمعية الجزائرية السويدية في مالمو
               </span>
             </div>
           </Link>

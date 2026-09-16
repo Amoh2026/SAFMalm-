@@ -136,7 +136,7 @@ export default function KulturPage() {
         <div className="relative w-full h-75 md:h-100 lg:h-125">
           <Image
             src="/images/AlgerCombine.png"
-            alt={tr('cultureTitle')}
+            alt="Fritids- och föreningsaktiviteter"
             fill
             className="object-cover object-center"
             priority
@@ -149,12 +149,9 @@ export default function KulturPage() {
       <section className="py-8 md:py-12 bg-white">
         <div className="container mx-auto px-4 max-w-4xl">
           <div className="text-center">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-blue-900 mb-4">
-              {tr('cultureTitle')}
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-blue-900 mb-4">
+              Fritids- och föreningsaktiviteter
             </h1>
-            <h2 className="text-2xl md:text-3xl font-bold text-blue-700 mb-4">
-              {tr('cultureSubtitle')}
-            </h2>
             <p className="text-lg md:text-xl text-gray-700 leading-relaxed max-w-3xl mx-auto">
               {tr('cultureDescription')}
             </p>

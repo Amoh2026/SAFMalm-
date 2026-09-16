@@ -15,10 +15,7 @@ export function Footer() {
       <div className="container mx-auto px-4 py-12">
         <div className="grid md:grid-cols-4 gap-8">
           {/* About Section */}
-          <div>
-            <h3 className="text-white font-bold text-xl mb-4">{t('common.organizationName')}</h3>
-            <p className="text-sm">{t('common.footerTagline')}</p>
-          </div>
+         
 
           {/* Quick Links */}
           <div>
@@ -103,7 +100,7 @@ export function Footer() {
 
         {/* Copyright */}
         <div className="border-t border-gray-800 mt-8 pt-8 text-sm text-center">
-          <p>{t('common.copyright')}</p>
+          <p>© 2026 Svensk Algeriska Föreningen i Malmö. Alla rättigheter förbehållna.</p>
         </div>
       </div>
     </footer>

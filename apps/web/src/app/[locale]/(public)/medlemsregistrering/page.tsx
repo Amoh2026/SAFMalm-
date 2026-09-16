@@ -142,20 +142,20 @@ export default function AdminApplicationsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Button
             variant="outline"
             size="sm"
             onClick={() => router.push('/admin/members')}
-            className="border-2 border-blue-400 hover:bg-blue-50 hover:border-blue-600"
+            className="border-2 border-blue-400 hover:bg-blue-50 hover:border-blue-600 w-full sm:w-auto"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Tillbaka till medlemmar
           </Button>
-          <h1 className="text-3xl font-bold text-blue-900">📝 Medlemsansökningar</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-blue-900">📝 Medlemsansökningar</h1>
         </div>
-        <div className="text-sm bg-yellow-50 border-2 border-yellow-400 px-4 py-2 rounded-lg font-medium text-yellow-800">
+        <div className="text-sm bg-yellow-50 border-2 border-yellow-400 px-4 py-2 rounded-lg font-medium text-yellow-800 text-center sm:text-left">
           {applications.length} väntande ansökningar
         </div>
       </div>
@@ -178,7 +178,87 @@ export default function AdminApplicationsPage() {
         </div>
       </div>
 
-      <Card className="border-2 border-blue-400 shadow-lg overflow-hidden">
+      {/* Mobile card view — visible below md */}
+      <div className="md:hidden space-y-4">
+        {filtered.length === 0 ? (
+          <Card className="border-2 border-blue-400">
+            <CardContent className="p-8 text-center text-gray-500">
+              {searchTerm ? 'Inga ansökningar matchar din sökning.' : 'Inga väntande ansökningar hittades.'}
+            </CardContent>
+          </Card>
+        ) : (
+          filtered.map((app) => (
+            <Card key={app.id} className="border-2 border-blue-400 shadow-md overflow-hidden">
+              <CardContent className="p-4 space-y-3">
+                {/* Header: name + status badge */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <User className="h-4 w-4 text-blue-600 shrink-0" />
+                    <span className="text-sm font-semibold text-gray-900 truncate">{app.name}</span>
+                  </div>
+                  <span className="px-2 py-1 text-xs rounded-full border-2 border-yellow-400 bg-yellow-100 text-yellow-800 font-semibold shrink-0">
+                    Väntar
+                  </span>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-start gap-2">
+                    <Mail className="h-4 w-4 text-gray-500 shrink-0 mt-0.5" />
+                    <span className="text-gray-700 break-all">{app.email || '—'}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Phone className="h-4 w-4 text-gray-500 shrink-0 mt-0.5" />
+                    <span className="text-gray-700">{app.phone || '—'}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <User className="h-4 w-4 text-gray-500 shrink-0 mt-0.5" />
+                    <span className="text-gray-700">Åldersgrupp: {app.ageGroup || '—'}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Calendar className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                    <span className="text-gray-500">
+                      {app.createdAt ? new Date(app.createdAt).toLocaleDateString('sv-SE') : '-'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2 border-t border-blue-200">
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white border-2 border-green-400"
+                    onClick={() => handleApprove(app)}
+                    disabled={actionLoading === app.id}
+                  >
+                    {actionLoading === app.id ? (
+                      '⏳'
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Godkänn
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="flex-1 border-2 border-red-400"
+                    onClick={() => handleReject(app)}
+                    disabled={actionLoading === app.id}
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Avvisa
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table view — visible from md and up */}
+      <Card className="hidden md:block border-2 border-blue-400 shadow-lg overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">

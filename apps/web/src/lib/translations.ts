@@ -349,9 +349,8 @@ events: {
 
     // ============ CULTURE ============
     culture: {
-      cultureTitle: "Kultur",
-      cultureSubtitle: "Algerisk Kultur i Sverige",
-      cultureDescription: "Upptäck den rika algeriska kulturen genom musik, mat, konst och traditioner. Här är några av våra senaste evenemang och aktiviteter som visar vår stolta gemenskap.",
+      cultureSubtitle: "Fritids- och föreningsaktiviteter",
+      cultureDescription: "Upptäck den rika algeriska Fritids- och föreningsaktiviteter genom musik, mat, konst och traditioner. Här är några av våra senaste evenemang och aktiviteter som visar vår stolta gemenskap.",
       ourActivities: "Våra Aktiviteter",
       ourActivitiesDesc: "Genom fest, resor, dialog och engagemang bygger vi broar mellan Malmö och Algeriet.",
       festivalTitle: "Kulturfestival i Folkets Park",
@@ -950,9 +949,9 @@ events: {
 },
 
     culture: {
-      cultureTitle: "Culture",
-      cultureSubtitle: "Algerian Culture in Sweden",
-      cultureDescription: "Discover the rich Algerian culture through music, food, art, and traditions. Here are some of our latest events and activities showcasing our proud community.",
+     
+      cultureSubtitle: "Leisure and Association Activities",
+      cultureDescription: "Discover the rich Algerian leisure and association activities through music, food, art, and traditions. Here are some of our latest events and activities showcasing our proud community.",
       ourActivities: "Our Activities",
       ourActivitiesDesc: "Through celebration, travel, dialogue, and engagement, we build bridges between Malmö and Algeria.",
       festivalTitle: "Culture Festival in Folkets Park",
@@ -1541,9 +1540,8 @@ events: {
 },
 
     culture: {
-      cultureTitle: "Culture",
-      cultureSubtitle: "Culture Algérienne en Suède",
-      cultureDescription: "Découvrez la riche culture algérienne à travers la musique, la gastronomie, l'art et les traditions. Voici quelques-uns de nos derniers événements et activités qui mettent en valeur notre fière communauté.",
+      cultureSubtitle: "Activités de loisirs et associatives",
+      cultureDescription: "Découvrez la riche des activités de loisirs et associatives algériennes à travers  la musique, la gastronomie, l'art et les traditions. Voici quelques-uns de nos derniers événements et activités qui mettent en valeur notre fière communauté.",
       ourActivities: "Nos Activités",
       ourActivitiesDesc: "À travers les fêtes, les voyages, le dialogue et l'engagement, nous construisons des ponts entre Malmö et l'Algérie.",
       festivalTitle: "Festival Culturel au Folkets Park",
@@ -2132,10 +2130,8 @@ events: {
 },
 
     culture: {
-      cultureTitle: "الثقافة",
-      cultureSubtitle: "الثقافة الجزائرية في السويد",
-      cultureDescription: "اكتشف الثقافة الجزائرية الغنية من خلال الموسيقى والطعام والفن والتقاليد. إليك بعض من أحدث فعالياتنا وأنشطتنا التي تعرض مجتمعنا الفخور.",
-      ourActivities: "أنشطتنا",
+      cultureSubtitle: "أنشطة الترفيه والجمعيات",
+      cultureDescription: "اكتشف أنشطة الترفيه والجمعيات الجزائرية الغنية من خلال الموسيقى والطعام والفن والتقاليد. إليك بعض من أحدث فعالياتنا وأنشطتنا التي تُظهر مجتمعنا الفخور.", ourActivities: "أنشطتنا",
       ourActivitiesDesc: "من خلال الاحتفال والسفر والحوار والمشاركة، نبني جسوراً بين مالمو والجزائر.",
       festivalTitle: "مهرجان ثقافي في فولكيتس بارك",
       festivalSubtitle: "مهرجان متعدد الثقافات في فولكيتس بارك",
