@@ -147,7 +147,7 @@ export async function sendRejectionEmail(params: {
         <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
         <p style="font-size: 12px; color: #999;">
           Svensk Algeriska Föreningen i Malmö<br />
-          Scheelegatan 7, 212 28 Malmö
+          Scheegatan 7, 212 28 Malmö
         </p>
       </div>
     `,

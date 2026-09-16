@@ -6,15 +6,11 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase/client';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { CheckCircle, User, Mail, Phone, Home, Users, CreditCard } from 'lucide-react';
 
 export default function MedlemsregistreringPage() {
   const params = useParams();
   const locale = (params?.locale as string) || 'sv';
-  const { user } = useAuth();
 
   const [form, setForm] = useState({
     name: '',
@@ -40,21 +36,17 @@ export default function MedlemsregistreringPage() {
     setSubmitting(true);
 
     try {
-      if (!form.name || !form.email || !form.phone) {
-        throw new Error('Fyll i namn, e-post och telefon.');
-      }
-
-      await addDoc(collection(db, 'members'), {
-        name: form.name.trim(),
-        email: form.email.trim().toLowerCase(),
-        phone: form.phone.trim(),
-        address: form.address.trim(),
-        ageGroup: form.ageGroup,
-        swishReference: form.swishReference.trim(),
-        status: 'pending',
-        createdAt: Timestamp.now(),
-        userId: user?.id || null,
+      const res = await fetch('/api/member-applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
       });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Något gick fel. Försök igen.');
+      }
 
       setSuccess(true);
       setForm({
@@ -85,22 +77,18 @@ export default function MedlemsregistreringPage() {
               Tack för din ansökan!
             </h1>
             <p className="text-gray-600 mb-6">
-              Vi har mottagit din medlemsansökan och kommer att granska den inom kort. Du får ett svar via e-post.
+              Vi har skickat ett bekräftelsemail till <strong>{form.email || 'din e-post'}</strong>.
+              Klicka på länken i e-postmeddelandet för att bekräfta din ansökan.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link
-                href={`/${locale}`}
-                className="inline-flex items-center justify-center px-6 py-3 bg-blue-900 text-white font-semibold rounded-lg hover:bg-blue-800 transition"
-              >
-                Tillbaka till startsidan
-              </Link>
-              <button
-                onClick={() => setSuccess(false)}
-                className="inline-flex items-center justify-center px-6 py-3 border-2 border-blue-900 text-blue-900 font-semibold rounded-lg hover:bg-blue-50 transition"
-              >
-                Skicka en till ansökan
-              </button>
-            </div>
+            <p className="text-sm text-gray-500 mb-6">
+              Länken är giltig i 48 timmar.
+            </p>
+            <Link
+              href={`/${locale}`}
+              className="inline-flex items-center justify-center px-6 py-3 bg-blue-900 text-white font-semibold rounded-lg hover:bg-blue-800 transition"
+            >
+              Tillbaka till startsidan
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -181,12 +169,13 @@ export default function MedlemsregistreringPage() {
 
               <div>
                 <label className="flex items-center gap-2 text-sm font-semibold text-blue-900 mb-2">
-                  <Users className="h-4 w-4" /> Åldersgrupp
+                  <Users className="h-4 w-4" /> Åldersgrupp *
                 </label>
                 <select
                   name="ageGroup"
                   value={form.ageGroup}
                   onChange={handleChange}
+                  required
                   className="w-full h-10 px-3 rounded-md border-2 border-blue-300 focus:border-blue-600 bg-white text-sm"
                 >
                   <option value="">Välj åldersgrupp</option>
@@ -226,6 +215,10 @@ export default function MedlemsregistreringPage() {
               >
                 {submitting ? 'Skickar...' : 'Skicka ansökan'}
               </Button>
+
+              <p className="text-xs text-gray-500 text-center mt-2">
+                Efter att du skickat in formuläret får du ett e-postmeddelande för att bekräfta din adress.
+              </p>
             </form>
           </CardContent>
         </Card>
