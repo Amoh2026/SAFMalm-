@@ -1,14 +1,14 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const FROM = 'Svensk Algeriska Föreningen <noreply@safmalmo.se>';
 const ADMIN_EMAIL = 'safmalmoe@gmail.com';
 
-/**
- * Send the confirmation email with the verification link.
- * Used right after the Bli Medlem form is submitted.
- */
+function getResend() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error('RESEND_API_KEY is not configured');
+  return new Resend(key);
+}
+
 export async function sendConfirmationEmail(params: {
   to: string;
   name: string;
@@ -17,7 +17,7 @@ export async function sendConfirmationEmail(params: {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://safmalmo.se';
   const verifyUrl = `${siteUrl}/api/verify-application?token=${params.token}`;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM,
     to: params.to,
     subject: 'Bekräfta din medlemsansökan',
@@ -50,9 +50,6 @@ export async function sendConfirmationEmail(params: {
   });
 }
 
-/**
- * Notify admin that a new application has arrived (after email confirmed).
- */
 export async function sendAdminNotification(params: {
   applicantName: string;
   applicationId: string;
@@ -60,7 +57,7 @@ export async function sendAdminNotification(params: {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://safmalmo.se';
   const adminUrl = `${siteUrl}/sv/admin/members/applications`;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM,
     to: ADMIN_EMAIL,
     subject: `Ny medlemsansökan från ${params.applicantName}`,
@@ -81,9 +78,6 @@ export async function sendAdminNotification(params: {
   });
 }
 
-/**
- * Notify user that their application was approved.
- */
 export async function sendApprovalEmail(params: {
   to: string;
   name: string;
@@ -91,7 +85,7 @@ export async function sendApprovalEmail(params: {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://safmalmo.se';
   const loginUrl = `${siteUrl}/sv/login`;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM,
     to: params.to,
     subject: 'Din medlemsansökan har godkänts',
@@ -102,7 +96,7 @@ export async function sendApprovalEmail(params: {
           Din ansökan om medlemskap i Svensk Algeriska Föreningen i Malmö har godkänts.
         </p>
         <p style="font-size: 16px; line-height: 1.6;">
-          Du kan nu logga in på vår webbplats. Om du inte redan har skapat ett konto kan du göra det på samma sida.
+          Du kan nu logga in på vår webbplats.
         </p>
         <p style="text-align: center; margin: 30px 0;">
           <a href="${loginUrl}"
@@ -121,14 +115,11 @@ export async function sendApprovalEmail(params: {
   });
 }
 
-/**
- * Notify user that their application was rejected.
- */
 export async function sendRejectionEmail(params: {
   to: string;
   name: string;
 }) {
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM,
     to: params.to,
     subject: 'Angående din medlemsansökan',
@@ -147,7 +138,7 @@ export async function sendRejectionEmail(params: {
         <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
         <p style="font-size: 12px; color: #999;">
           Svensk Algeriska Föreningen i Malmö<br />
-          Scheegatan 7, 212 28 Malmö
+          Scheelegatan 7, 212 28 Malmö
         </p>
       </div>
     `,
