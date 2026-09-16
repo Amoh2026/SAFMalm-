@@ -14,10 +14,10 @@ export async function GET() {
     steps: [],
   };
 
-  // Step 1: try to import firebase-admin
+  // Step 1: Firebase Admin init
   try {
     const { cert, getApps, initializeApp } = await import('firebase-admin/app');
-    result.steps.push('✅ firebase-admin/app imported');
+    result.steps.push('OK: firebase-admin/app imported');
 
     if (!getApps().length) {
       const rawKey = process.env.FIREBASE_PRIVATE_KEY || '';
@@ -30,36 +30,36 @@ export async function GET() {
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         }),
       });
-      result.steps.push('✅ Firebase Admin initialized');
+      result.steps.push('OK: Firebase Admin initialized');
     } else {
-      result.steps.push('ℹ️ Firebase Admin already initialized');
+      result.steps.push('OK: Firebase Admin already initialized');
     }
   } catch (err: any) {
-    result.steps.push('❌ Firebase init failed: ' + (err?.message || String(err)));
-    result.firebaseErrorStack = err?.stack;
-    return NextResponse.json(result, { status: 200 });
+    result.steps.push('FAIL Firebase init: ' + (err?.message || String(err)));
+    result.firebaseErrorStack = String(err?.stack || '').slice(0, 800);
+    return NextResponse.json(result);
   }
 
-  // Step 2: try Firestore read
+  // Step 2: Firestore query
   try {
     const { getFirestore } = await import('firebase-admin/firestore');
     const db = getFirestore();
     const snapshot = await db.collection('members').limit(1).get();
-    result.steps.push(`✅ Firestore query OK — found ${snapshot.size} docs`);
+    result.steps.push('OK: Firestore query — found ' + snapshot.size + ' docs');
   } catch (err: any) {
-    result.steps.push('❌ Firestore query failed: ' + (err?.message || String(err)));
-    result.firestoreErrorStack = err?.stack;
-    return NextResponse.json(result, { status: 200 });
+    result.steps.push('FAIL Firestore query: ' + (err?.message || String(err)));
+    result.firestoreErrorStack = String(err?.stack || '').slice(0, 800);
+    return NextResponse.json(result);
   }
 
-  // Step 3: try Resend init
+  // Step 3: Resend client
   try {
     const { Resend } = await import('resend');
-    const r = new Resend(process.env.RESEND_API_KEY);
-    result.steps.push('✅ Resend client created');
+    new Resend(process.env.RESEND_API_KEY);
+    result.steps.push('OK: Resend client created');
   } catch (err: any) {
-    result.steps.push('❌ Resend init failed: ' + (err?.message || String(err)));
-    return NextResponse.json(result, { status: 200 });
+    result.steps.push('FAIL Resend init: ' + (err?.message || String(err)));
+    return NextResponse.json(result);
   }
 
   result.status = 'ALL OK';
