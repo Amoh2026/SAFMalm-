@@ -1,25 +1,27 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
-import { sendConfirmationEmail } from '@/lib/email';
 import crypto from 'crypto';
-import { Timestamp } from 'firebase-admin/firestore';
 
 export async function POST(request: Request) {
+  const steps: string[] = [];
+
   try {
+    steps.push('1. Parsing body');
     const body = await request.json();
     const { name, phone, email, address, ageGroup, swishReference } = body;
 
-    // Validate required fields
     if (!name || !phone || !email || !ageGroup) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
+        { success: false, error: 'Missing required fields', steps },
         { status: 400 }
       );
     }
 
-    const emailLower = email.toLowerCase().trim();
+    steps.push('2. Importing Firebase Admin');
+    const { adminDb } = await import('@/lib/firebase/admin');
+    const { Timestamp } = await import('firebase-admin/firestore');
 
-    // Check if there's already an active or pending application for this email
+    steps.push('3. Checking existing application');
+    const emailLower = email.toLowerCase().trim();
     const existing = await adminDb
       .collection('members')
       .where('email', '==', emailLower)
@@ -29,16 +31,20 @@ export async function POST(request: Request) {
 
     if (!existing.empty) {
       return NextResponse.json(
-        { success: false, error: 'En ansökan med denna e-post finns redan.' },
+        {
+          success: false,
+          error: 'En ansökan med denna e-post finns redan.',
+          steps,
+        },
         { status: 409 }
       );
     }
 
-    // Generate verification token
+    steps.push('4. Generating token');
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = Timestamp.fromMillis(Date.now() + 48 * 60 * 60 * 1000); // 48h
+    const expiresAt = Timestamp.fromMillis(Date.now() + 48 * 60 * 60 * 1000);
 
-    // Save application
+    steps.push('5. Saving to Firestore');
     const docRef = await adminDb.collection('members').add({
       name: name.trim(),
       email: emailLower,
@@ -56,23 +62,32 @@ export async function POST(request: Request) {
       userAccountId: null,
     });
 
-    // Send confirmation email
+    steps.push('6. Importing email helper');
+    const { sendConfirmationEmail } = await import('@/lib/email');
+
+    steps.push('7. Sending confirmation email');
     await sendConfirmationEmail({
       to: emailLower,
       name: name.trim(),
       token,
     });
 
+    steps.push('8. Success');
     return NextResponse.json({
       success: true,
       id: docRef.id,
       message: 'Ansökan mottagen. Kolla din e-post för att bekräfta.',
+      steps,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error processing application:', error);
-    const msg = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { success: false, error: msg },
+      {
+        success: false,
+        error: error?.message || String(error),
+        stack: String(error?.stack || '').slice(0, 1000),
+        steps,
+      },
       { status: 500 }
     );
   }
