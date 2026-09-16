@@ -3,7 +3,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  serverExternalPackages: ['firebase-admin'],  // ← critical line
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**' },

@@ -16,9 +16,8 @@ export async function POST(request: Request) {
       );
     }
 
-    steps.push('2. Importing Firebase Admin');
+    steps.push('2. Importing Firestore');
     const { adminDb } = await import('@/lib/firebase/admin');
-    const { Timestamp } = await import('firebase-admin/firestore');
 
     steps.push('3. Checking existing application');
     const emailLower = email.toLowerCase().trim();
@@ -42,7 +41,7 @@ export async function POST(request: Request) {
 
     steps.push('4. Generating token');
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = Timestamp.fromMillis(Date.now() + 48 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     steps.push('5. Saving to Firestore');
     const docRef = await adminDb.collection('members').add({
@@ -55,7 +54,7 @@ export async function POST(request: Request) {
       status: 'pending_email',
       verificationToken: token,
       verificationExpiresAt: expiresAt,
-      createdAt: Timestamp.now(),
+      createdAt: new Date(),
       emailConfirmedAt: null,
       approvedAt: null,
       rejectedAt: null,
