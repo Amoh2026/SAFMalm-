@@ -1,9 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // 👇 Disable TS/ESLint errors during production build
+  // Disable TS/ESLint errors during production build
   typescript: {
     ignoreBuildErrors: true,
   },
+
+  // Exclude firebase-admin from bundling so it uses native Node.js require
+  serverExternalPackages: ['firebase-admin'],
 
   // Image configuration
   images: {
