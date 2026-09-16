@@ -42,10 +42,21 @@ export default function MedlemsregistreringPage() {
         body: JSON.stringify(form),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      console.log('API response status:', res.status);
+      console.log('API response body:', text);
+
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        throw new Error(
+          `Server error (${res.status}): ${text.slice(0, 300) || 'empty response'}`
+        );
+      }
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Något gick fel. Försök igen.');
+        throw new Error(data.error || `Server error (${res.status})`);
       }
 
       setSuccess(true);
