@@ -43,7 +43,7 @@ export default function AdminApplicationsPage() {
     if (!user) return;
     try {
       setLoading(true);
-      const memberQ = query(collection(db, 'members'), where('status', '==', 'pending'));
+      const memberQ = query(collection(db, 'members'), where('status', '==', 'pending_review'));
       const memberSnap = await getDocs(memberQ);
       const mApps: Application[] = [];
       memberSnap.forEach((d) => {
@@ -55,7 +55,7 @@ export default function AdminApplicationsPage() {
           phone: data.phone || '',
           ageGroup: data.ageGroup || '',
           createdAt: data.createdAt || '',
-          status: data.status || 'pending',
+          status: data.status || 'pending_review',
         });
       });
       mApps.sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
