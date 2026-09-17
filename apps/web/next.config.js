@@ -9,6 +9,14 @@ const nextConfig = {
       { protocol: 'http', hostname: 'localhost' },
     ],
   },
+  serverExternalPackages: [
+    'firebase-admin',
+    'firebase-admin/app',
+    'firebase-admin/auth',
+    'firebase-admin/firestore',
+    'jwks-rsa',
+    'jose',
+  ],
   async headers() {
     return [
       {
