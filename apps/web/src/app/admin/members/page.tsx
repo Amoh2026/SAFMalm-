@@ -13,73 +13,67 @@ import {
   Mail,
   Calendar,
   User as UserIcon,
+  Shield,
+  Clock,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase/client';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 
-interface Member {
+interface UserDoc {
   id: string;
   name: string;
   email: string;
   role: string;
   approved: boolean;
-  createdAt: string;
-  approvedAt?: string;
-  approvedBy?: string;
+  createdAt: any;
+  approvedAt?: any;
 }
 
 export default function AdminMembersPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [members, setMembers] = useState<Member[]>([]);
+  const [users, setUsers] = useState<UserDoc[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [tab, setTab] = useState<'all' | 'admins' | 'members' | 'pending'>('all');
 
   useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchData = async () => {
       if (!user) return;
       try {
         setLoading(true);
 
-        // 1. Fetch APPROVED users
-        // 1. Fetch APPROVED members (from `members` collection)
-const approvedQuery = query(
-  collection(db, 'members'),
-  where('status', '==', 'approved')
-);
-const approvedSnap = await getDocs(approvedQuery);
-
-const approvedList: Member[] = [];
-approvedSnap.forEach((docSnap) => {
-  const data = docSnap.data();
-  approvedList.push({
-    id: docSnap.id,
-    name: data.name || 'Okänd',
-    email: data.email || '',
-    role: 'MEMBER',
-    approved: true,
-    createdAt: data.createdAt || '',
-    approvedAt: data.approvedAt,
-    approvedBy: data.approvedBy,
-  });
-});
-        approvedList.sort((a, b) => {
-          const aDate = a.approvedAt || a.createdAt;
-          const bDate = b.approvedAt || b.createdAt;
-          return aDate > bDate ? -1 : 1;
+        // All users from Firestore users collection
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const list: UserDoc[] = [];
+        usersSnap.forEach((d) => {
+          const data = d.data();
+          list.push({
+            id: d.id,
+            name: data.name || 'Okand',
+            email: data.email || '',
+            role: data.role || 'MEMBER',
+            approved: data.approved === true,
+            createdAt: data.createdAt || '',
+            approvedAt: data.approvedAt,
+          });
         });
+        list.sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() ?? 0;
+          const tb = b.createdAt?.toMillis?.() ?? 0;
+          return tb - ta;
+        });
+        setUsers(list);
 
-        setMembers(approvedList);
-
-        // 2. Count pending users
-        const pendingQuery = query(
-          collection(db, 'users'),
-          where('approved', '==', false)
+        // Pending applications count (from pending_verifications)
+        const pendingQ = query(
+          collection(db, 'pending_verifications'),
+          where('emailConfirmed', '==', true)
         );
-        const pendingSnap = await getDocs(pendingQuery);
+        const pendingSnap = await getDocs(pendingQ);
         setPendingCount(pendingSnap.size);
 
         setError('');
@@ -91,34 +85,12 @@ approvedSnap.forEach((docSnap) => {
       }
     };
 
-    fetchMembers();
+    fetchData();
   }, [user]);
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
+    if (!user) router.push('/login');
   }, [user, router]);
-
-  const filteredMembers = members.filter((member) => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      member.name?.toLowerCase().includes(search) ||
-      member.email?.toLowerCase().includes(search)
-    );
-  });
-
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-12 text-center">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-        <p className="mt-4 text-gray-500">Laddar medlemmar...</p>
-      </div>
-    );
-  }
-
-  if (!user) return null;
 
   const formatDate = (value: any) => {
     if (!value) return '-';
@@ -135,6 +107,36 @@ approvedSnap.forEach((docSnap) => {
     if (isNaN(date.getTime())) return '-';
     return date.toLocaleDateString('sv-SE');
   };
+
+  const admins = users.filter((u) => u.role === 'ADMIN');
+  const members = users.filter((u) => u.role === 'MEMBER' && u.approved);
+  const pendingUsers = users.filter((u) => !u.approved);
+
+  const currentList =
+    tab === 'admins'
+      ? admins
+      : tab === 'members'
+      ? members
+      : tab === 'pending'
+      ? pendingUsers
+      : users;
+
+  const filtered = currentList.filter(
+    (u) =>
+      u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-12 text-center">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+        <p className="mt-4 text-gray-500">Laddar medlemmar...</p>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -157,15 +159,14 @@ approvedSnap.forEach((docSnap) => {
 
         <div className="flex gap-2 flex-wrap">
           <Button
-            className="bg-green-600 hover:bg-green-700 text-white border-2 border-green-400 hover:border-green-500"
+            className="bg-green-600 hover:bg-green-700 text-white border-2 border-green-400"
             onClick={() => router.push('/admin/members/approved')}
           >
             <UserCheck className="h-4 w-4 mr-2" />
-            Godkända medlemmar
+            Godkända ansökningar
           </Button>
-
           <Button
-            className="bg-yellow-600 hover:bg-yellow-700 text-white relative border-2 border-yellow-400 hover:border-yellow-500"
+            className="bg-yellow-600 hover:bg-yellow-700 text-white relative border-2 border-yellow-400"
             onClick={() => router.push('/admin/members/applications')}
           >
             <FileText className="h-4 w-4 mr-2" />
@@ -186,11 +187,46 @@ approvedSnap.forEach((docSnap) => {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <Card className="bg-green-50 border-2 border-green-400 shadow-md">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <Card
+          className={`bg-blue-50 border-2 border-blue-400 shadow-md cursor-pointer transition ${
+            tab === 'all' ? 'ring-4 ring-blue-300' : 'hover:bg-blue-100'
+          }`}
+          onClick={() => setTab('all')}
+        >
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-sm text-green-600 font-medium">Godkända medlemmar</p>
+              <p className="text-sm text-blue-600 font-medium">Alla</p>
+              <p className="text-2xl font-bold text-blue-900">{users.length}</p>
+            </div>
+            <UserIcon className="h-8 w-8 text-blue-500" />
+          </CardContent>
+        </Card>
+
+        <Card
+          className={`bg-purple-50 border-2 border-purple-400 shadow-md cursor-pointer transition ${
+            tab === 'admins' ? 'ring-4 ring-purple-300' : 'hover:bg-purple-100'
+          }`}
+          onClick={() => setTab('admins')}
+        >
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-purple-600 font-medium">Admins</p>
+              <p className="text-2xl font-bold text-purple-900">{admins.length}</p>
+            </div>
+            <Shield className="h-8 w-8 text-purple-500" />
+          </CardContent>
+        </Card>
+
+        <Card
+          className={`bg-green-50 border-2 border-green-400 shadow-md cursor-pointer transition ${
+            tab === 'members' ? 'ring-4 ring-green-300' : 'hover:bg-green-100'
+          }`}
+          onClick={() => setTab('members')}
+        >
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-green-600 font-medium">Medlemmar</p>
               <p className="text-2xl font-bold text-green-900">{members.length}</p>
             </div>
             <UserCheck className="h-8 w-8 text-green-500" />
@@ -198,17 +234,63 @@ approvedSnap.forEach((docSnap) => {
         </Card>
 
         <Card
-          className="bg-yellow-50 border-2 border-yellow-400 shadow-md cursor-pointer hover:bg-yellow-100 transition"
-          onClick={() => router.push('/admin/members/applications')}
+          className={`bg-yellow-50 border-2 border-yellow-400 shadow-md cursor-pointer transition ${
+            tab === 'pending' ? 'ring-4 ring-yellow-300' : 'hover:bg-yellow-100'
+          }`}
+          onClick={() => setTab('pending')}
         >
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-sm text-yellow-600 font-medium">Väntande ansökningar</p>
-              <p className="text-2xl font-bold text-yellow-900">{pendingCount}</p>
+              <p className="text-sm text-yellow-600 font-medium">Väntande</p>
+              <p className="text-2xl font-bold text-yellow-900">{pendingUsers.length}</p>
             </div>
-            <FileText className="h-8 w-8 text-yellow-500" />
+            <Clock className="h-8 w-8 text-yellow-500" />
           </CardContent>
         </Card>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 border-b-2 border-gray-200 overflow-x-auto">
+        <button
+          onClick={() => setTab('all')}
+          className={`px-6 py-3 font-semibold transition border-b-4 -mb-0.5 whitespace-nowrap ${
+            tab === 'all'
+              ? 'border-blue-500 text-blue-900'
+              : 'border-transparent text-gray-500 hover:text-blue-900'
+          }`}
+        >
+          Alla ({users.length})
+        </button>
+        <button
+          onClick={() => setTab('admins')}
+          className={`px-6 py-3 font-semibold transition border-b-4 -mb-0.5 whitespace-nowrap ${
+            tab === 'admins'
+              ? 'border-purple-500 text-purple-900'
+              : 'border-transparent text-gray-500 hover:text-purple-900'
+          }`}
+        >
+          Admins ({admins.length})
+        </button>
+        <button
+          onClick={() => setTab('members')}
+          className={`px-6 py-3 font-semibold transition border-b-4 -mb-0.5 whitespace-nowrap ${
+            tab === 'members'
+              ? 'border-green-500 text-green-900'
+              : 'border-transparent text-gray-500 hover:text-green-900'
+          }`}
+        >
+          Medlemmar ({members.length})
+        </button>
+        <button
+          onClick={() => setTab('pending')}
+          className={`px-6 py-3 font-semibold transition border-b-4 -mb-0.5 whitespace-nowrap ${
+            tab === 'pending'
+              ? 'border-yellow-500 text-yellow-900'
+              : 'border-transparent text-gray-500 hover:text-yellow-900'
+          }`}
+        >
+          Väntande ({pendingUsers.length})
+        </button>
       </div>
 
       {/* Search */}
@@ -216,20 +298,15 @@ approvedSnap.forEach((docSnap) => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="Sök medlemmar (skriv namn eller e-post)..."
+            placeholder="Sök (namn eller e-post)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 border-2 border-blue-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 transition"
+            className="pl-10 border-2 border-blue-400 focus:border-blue-600"
           />
         </div>
-        {searchTerm && (
-          <p className="text-sm text-gray-500 mt-2">
-            Visar {filteredMembers.length} av {members.length} medlemmar som matchar "{searchTerm}"
-          </p>
-        )}
       </div>
 
-      {/* Members Table */}
+      {/* List */}
       <Card className="border-2 border-blue-400 shadow-lg overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -246,51 +323,69 @@ approvedSnap.forEach((docSnap) => {
                     Roll
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-blue-900 uppercase tracking-wider">
-                    Godkänd
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-blue-900 uppercase tracking-wider">
+                    Registrerad
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-blue-200">
-                {filteredMembers.length === 0 ? (
+                {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                       {searchTerm
-                        ? `Inga medlemmar matchar "${searchTerm}"`
-                        : 'Inga godkända medlemmar ännu.'}
+                        ? `Inga matchningar för "${searchTerm}"`
+                        : 'Inga användare i denna kategori.'}
                     </td>
                   </tr>
                 ) : (
-                  filteredMembers.map((member) => (
-                    <tr key={member.id} className="hover:bg-blue-50/50 transition">
+                  filtered.map((u) => (
+                    <tr key={u.id} className="hover:bg-blue-50/50 transition">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <UserIcon className="h-4 w-4 text-blue-600" />
+                          {u.role === 'ADMIN' ? (
+                            <Shield className="h-4 w-4 text-purple-600" />
+                          ) : (
+                            <UserIcon className="h-4 w-4 text-blue-600" />
+                          )}
                           <span className="text-sm font-medium text-gray-900">
-                            {member.name}
+                            {u.name}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <Mail className="h-3 w-3 text-gray-500" />
-                          <span className="text-sm text-gray-600">{member.email}</span>
+                          <span className="text-sm text-gray-600">{u.email}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 py-1 text-xs rounded-full border-2 ${
-                            member.role === 'ADMIN'
+                            u.role === 'ADMIN'
                               ? 'border-purple-400 bg-purple-100 text-purple-800'
                               : 'border-blue-400 bg-blue-100 text-blue-800'
                           }`}
                         >
-                          {member.role}
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full ${
+                            u.approved
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}
+                        >
+                          {u.approved ? 'Godkänd' : 'Väntar'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-green-600" />
-                          {formatDate(member.approvedAt || member.createdAt)}
+                          <Calendar className="h-3 w-3 text-blue-600" />
+                          {formatDate(u.approvedAt || u.createdAt)}
                         </div>
                       </td>
                     </tr>
@@ -304,7 +399,7 @@ approvedSnap.forEach((docSnap) => {
 
       <div className="mt-6 flex justify-between items-center">
         <p className="text-sm text-gray-600">
-          Visar {filteredMembers.length} av {members.length} medlemmar
+          Visar {filtered.length} av {currentList.length} användare
         </p>
       </div>
     </div>
