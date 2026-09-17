@@ -9,12 +9,15 @@ function getResend() {
   return new Resend(key);
 }
 
+// ─────────────────────────────────────────────────────────
+// 1. Confirmation email — sent on form submit
+// ─────────────────────────────────────────────────────────
 export async function sendConfirmationEmail(params: {
   to: string;
   name: string;
   token: string;
 }) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://safmalmo.se';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.safmalmo.se';
   const verifyUrl = `${siteUrl}/api/verify-application?token=${params.token}`;
 
   return getResend().emails.send({
@@ -50,12 +53,15 @@ export async function sendConfirmationEmail(params: {
   });
 }
 
+// ─────────────────────────────────────────────────────────
+// 2. Admin notification — sent on email confirmation
+// ─────────────────────────────────────────────────────────
 export async function sendAdminNotification(params: {
   applicantName: string;
-  applicationId: string;
+  applicantEmail: string;
 }) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://safmalmo.se';
-  const adminUrl = `${siteUrl}/sv/admin/members/applications`;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.safmalmo.se';
+  const adminUrl = `${siteUrl}/sv/login`;
 
   return getResend().emails.send({
     from: FROM,
@@ -65,25 +71,34 @@ export async function sendAdminNotification(params: {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #1e3a8a;">Ny medlemsansökan</h1>
         <p style="font-size: 16px; line-height: 1.6;">
-          En ny ansökan har inkommit från <strong>${params.applicantName}</strong>.
+          En ny ansökan har inkommit från <strong>${params.applicantName}</strong> (${params.applicantEmail}).
+        </p>
+        <p style="font-size: 16px; line-height: 1.6;">
+          Logga in på adminpanelen för att granska ansökan.
         </p>
         <p style="text-align: center; margin: 30px 0;">
           <a href="${adminUrl}"
              style="background-color: #1e3a8a; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-            Granska ansökan
+            Logga in på adminpanelen
           </a>
+        </p>
+        <p style="font-size: 14px; color: #666; line-height: 1.6;">
+          Gå sedan till <strong>Admin → Ansökningar</strong> i menyn.
         </p>
       </div>
     `,
   });
 }
 
+// ─────────────────────────────────────────────────────────
+// 3. Approval email — sent when admin approves application
+// ─────────────────────────────────────────────────────────
 export async function sendApprovalEmail(params: {
   to: string;
   name: string;
 }) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://safmalmo.se';
-  const loginUrl = `${siteUrl}/sv/login`;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.safmalmo.se';
+  const registerUrl = `${siteUrl}/sv/register?email=${encodeURIComponent(params.to)}`;
 
   return getResend().emails.send({
     from: FROM,
@@ -96,12 +111,12 @@ export async function sendApprovalEmail(params: {
           Din ansökan om medlemskap i Svensk Algeriska Föreningen i Malmö har godkänts.
         </p>
         <p style="font-size: 16px; line-height: 1.6;">
-          Du kan nu logga in på vår webbplats.
+          Skapa ditt konto genom att klicka på knappen nedan. Använd samma e-postadress som du ansökte med.
         </p>
         <p style="text-align: center; margin: 30px 0;">
-          <a href="${loginUrl}"
+          <a href="${registerUrl}"
              style="background-color: #16a34a; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-            Logga in
+            Skapa mitt konto
           </a>
         </p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
@@ -115,6 +130,9 @@ export async function sendApprovalEmail(params: {
   });
 }
 
+// ─────────────────────────────────────────────────────────
+// 4. Rejection email
+// ─────────────────────────────────────────────────────────
 export async function sendRejectionEmail(params: {
   to: string;
   name: string;

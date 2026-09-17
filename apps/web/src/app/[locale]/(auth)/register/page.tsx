@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,8 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff, User, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
 
-export default function RegisterPage() {
+function RegisterPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { register } = useAuth();
   const { t, locale } = useLanguage();
 
@@ -27,6 +28,12 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // Pre-fill email from ?email= query param (from approval email link)
+  useEffect(() => {
+    const prefilled = searchParams.get('email');
+    if (prefilled) setEmail(prefilled);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,10 +56,10 @@ export default function RegisterPage() {
 
       if (result.success) {
         setSuccess(true);
-        // ✅ Redirect to /pending instead of /member/dashboard
-        const pendingPath = locale === 'sv' ? '/pending' : `/${locale}/pending`;
+        // One-approval flow: user is immediately active → redirect to login
+        const loginPath = locale === 'sv' ? '/sv/login' : `/${locale}/login`;
         setTimeout(() => {
-          router.push(pendingPath);
+          router.push(loginPath);
         }, 1500);
       } else {
         let errorKey = 'somethingWentWrong';
@@ -259,5 +266,13 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Laddar...</div>}>
+      <RegisterPageInner />
+    </Suspense>
   );
 }

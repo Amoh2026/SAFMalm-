@@ -16,7 +16,7 @@ interface Application {
   email: string;
   phone: string;
   ageGroup: string;
-  createdAt: string;
+  createdAt: any;
   status: string;
 }
 
@@ -25,7 +25,7 @@ interface UserAccount {
   name: string;
   email: string;
   role: string;
-  createdAt: string;
+  createdAt: any;
 }
 
 export default function AdminApplicationsPage() {
@@ -43,7 +43,12 @@ export default function AdminApplicationsPage() {
     if (!user) return;
     try {
       setLoading(true);
-      const memberQ = query(collection(db, 'members'), where('status', '==', 'pending_review'));
+
+      // Pending applications (unconfirmed email is filtered out)
+      const memberQ = query(
+        collection(db, 'pending_verifications'),
+        where('emailConfirmed', '==', true)
+      );
       const memberSnap = await getDocs(memberQ);
       const mApps: Application[] = [];
       memberSnap.forEach((d) => {
@@ -55,17 +60,23 @@ export default function AdminApplicationsPage() {
           phone: data.phone || '',
           ageGroup: data.ageGroup || '',
           createdAt: data.createdAt || '',
-          status: data.status || 'pending_review',
+          status: 'pending_review',
         });
       });
-      mApps.sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+      mApps.sort((a, b) => {
+        const ta = a.createdAt?.toMillis?.() ?? 0;
+        const tb = b.createdAt?.toMillis?.() ?? 0;
+        return tb - ta;
+      });
       setMemberApps(mApps);
 
+      // Pending user accounts
       const userQ = query(collection(db, 'users'), where('approved', '==', false));
       const userSnap = await getDocs(userQ);
       const uApps: UserAccount[] = [];
       userSnap.forEach((d) => {
         const data = d.data();
+        if (data.rejected === true) return;
         uApps.push({
           id: d.id,
           name: data.name || 'Okand',
@@ -74,7 +85,11 @@ export default function AdminApplicationsPage() {
           createdAt: data.createdAt || '',
         });
       });
-      uApps.sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+      uApps.sort((a, b) => {
+        const ta = a.createdAt?.toMillis?.() ?? 0;
+        const tb = b.createdAt?.toMillis?.() ?? 0;
+        return tb - ta;
+      });
       setUserApps(uApps);
       setError('');
     } catch (err) {
@@ -105,12 +120,20 @@ export default function AdminApplicationsPage() {
     if (!confirm(`Godkann medlemsansokan fran ${app.name}?`)) return;
     setActionLoading(app.id);
     try {
-      await updateDoc(doc(db, 'members', app.id), {
-        status: 'approved',
-        approvedAt: Timestamp.now(),
-        approvedBy: user?.id || null,
-        approvedByName: user?.name || 'Admin',
+      const res = await fetch('/api/admin/approve-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: app.id,
+          action: 'approve',
+          adminUid: user?.id || null,
+          adminName: user?.name || 'Admin',
+        }),
       });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Server error');
+      }
       setMemberApps((prev) => prev.filter((a) => a.id !== app.id));
       alert(`${app.name} har godkants!`);
     } catch (err) {
@@ -125,11 +148,20 @@ export default function AdminApplicationsPage() {
     if (!confirm(`Avvisa ansokan fran ${app.name}?`)) return;
     setActionLoading(app.id);
     try {
-      await updateDoc(doc(db, 'members', app.id), {
-        status: 'rejected',
-        rejectedAt: Timestamp.now(),
-        rejectedBy: user?.id || null,
+      const res = await fetch('/api/admin/approve-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: app.id,
+          action: 'reject',
+          adminUid: user?.id || null,
+          adminName: user?.name || 'Admin',
+        }),
       });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Server error');
+      }
       setMemberApps((prev) => prev.filter((a) => a.id !== app.id));
       alert('Ansokan avvisad.');
     } catch (err) {
@@ -311,7 +343,11 @@ export default function AdminApplicationsPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3 text-blue-600" />
-                            {app.createdAt ? new Date(app.createdAt).toLocaleDateString('sv-SE') : '-'}
+                            {app.createdAt?.toDate
+                              ? app.createdAt.toDate().toLocaleDateString('sv-SE')
+                              : app.createdAt
+                              ? new Date(app.createdAt).toLocaleDateString('sv-SE')
+                              : '-'}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -389,7 +425,11 @@ export default function AdminApplicationsPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3 text-blue-600" />
-                            {u.createdAt ? new Date(u.createdAt).toLocaleDateString('sv-SE') : '-'}
+                            {u.createdAt?.toDate
+                              ? u.createdAt.toDate().toLocaleDateString('sv-SE')
+                              : u.createdAt
+                              ? new Date(u.createdAt).toLocaleDateString('sv-SE')
+                              : '-'}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">

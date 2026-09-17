@@ -68,11 +68,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               approved = data.approved === true;
               if (data.name) displayName = data.name;
             } else {
-              approved = true;
+              // SECURITY: no user doc → not approved
+              approved = false;
             }
           } catch (error) {
             console.log('User doc check failed:', error);
-            approved = true;
+            // SECURITY: on error → not approved
+            approved = false;
           }
         }
 
@@ -122,10 +124,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: name,
           email: email,
           role: 'MEMBER',
-          approved: false,
+          approved: true,                             // ONE-APPROVAL: admin already approved the application
           createdAt: new Date().toISOString(),
-          approvedAt: null,
-          approvedBy: null,
+          approvedAt: new Date().toISOString(),
+          approvedBy: 'admin-via-application',
+          rejected: false,
         });
       } catch (docError) {
         console.warn('Could not create users doc:', docError);
