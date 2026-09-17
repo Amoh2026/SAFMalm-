@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { sendAdminNotification } from '@/lib/email';
 
@@ -27,8 +28,11 @@ export async function GET(request: Request) {
     const data: any = doc.data();
 
     if (data.verificationExpiresAt) {
-      const expiresAt = new Date(data.verificationExpiresAt);
-      if (expiresAt.getTime() < Date.now()) {
+      const expiresAtMs =
+        typeof data.verificationExpiresAt.toMillis === 'function'
+          ? data.verificationExpiresAt.toMillis()
+          : new Date(data.verificationExpiresAt).getTime();
+      if (expiresAtMs < Date.now()) {
         return NextResponse.redirect(`${siteUrl}/sv/verify-success?status=expired`);
       }
     }
@@ -39,8 +43,8 @@ export async function GET(request: Request) {
 
     await adminDb.collection('members').doc(doc.id).update({
       status: 'pending_review',
-      emailConfirmedAt: new Date(),
-      verificationToken: null,
+      emailConfirmedAt: FieldValue.serverTimestamp(),
+      verificationToken: FieldValue.delete(),
     });
 
     try {
