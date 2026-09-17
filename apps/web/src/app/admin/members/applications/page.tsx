@@ -44,7 +44,7 @@ export default function AdminApplicationsPage() {
     try {
       setLoading(true);
 
-      // Pending applications (unconfirmed email is filtered out)
+      // Pending applications from pending_verifications
       const memberQ = query(
         collection(db, 'pending_verifications'),
         where('emailConfirmed', '==', true)

@@ -6,51 +6,47 @@ import { sendAdminNotification } from '@/lib/email';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get('token');
-
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://safmalmo.se';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.safmalmo.se';
 
   if (!token) {
     return NextResponse.redirect(`${siteUrl}/sv/verify-success?status=invalid`);
   }
 
   try {
-    const snapshot = await adminDb
-      .collection('members')
-      .where('verificationToken', '==', token)
-      .limit(1)
-      .get();
+    const ref = adminDb.collection('pending_verifications').doc(token);
+    const snap = await ref.get();
 
-    if (snapshot.empty) {
+    if (!snap.exists) {
       return NextResponse.redirect(`${siteUrl}/sv/verify-success?status=invalid`);
     }
 
-    const doc = snapshot.docs[0];
-    const data: any = doc.data();
+    const data = snap.data()!;
 
-    if (data.verificationExpiresAt) {
-      const expiresAtMs =
-        typeof data.verificationExpiresAt.toMillis === 'function'
-          ? data.verificationExpiresAt.toMillis()
-          : new Date(data.verificationExpiresAt).getTime();
-      if (expiresAtMs < Date.now()) {
+    // Expiry check
+    if (data.expiresAt) {
+      const expiresMs =
+        typeof data.expiresAt.toMillis === 'function'
+          ? data.expiresAt.toMillis()
+          : new Date(data.expiresAt).getTime();
+      if (expiresMs < Date.now()) {
         return NextResponse.redirect(`${siteUrl}/sv/verify-success?status=expired`);
       }
     }
 
-    if (data.status !== 'pending_email') {
+    if (data.emailConfirmed === true) {
       return NextResponse.redirect(`${siteUrl}/sv/verify-success?status=already`);
     }
 
-    await adminDb.collection('members').doc(doc.id).update({
-      status: 'pending_review',
+    // Mark confirmed — members is STILL untouched
+    await ref.update({
+      emailConfirmed: true,
       emailConfirmedAt: FieldValue.serverTimestamp(),
-      verificationToken: FieldValue.delete(),
     });
 
     try {
       await sendAdminNotification({
         applicantName: data.name,
-        applicationId: doc.id,
+        applicantEmail: data.email,
       });
     } catch (emailErr) {
       console.error('Admin notification failed:', emailErr);
