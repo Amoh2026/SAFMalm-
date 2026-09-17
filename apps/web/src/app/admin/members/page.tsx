@@ -15,6 +15,7 @@ import {
   User as UserIcon,
   Shield,
   Clock,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase/client';
@@ -39,6 +40,7 @@ export default function AdminMembersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'all' | 'admins' | 'members' | 'pending'>('all');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,7 +48,6 @@ export default function AdminMembersPage() {
       try {
         setLoading(true);
 
-        // All users from Firestore users collection
         const usersSnap = await getDocs(collection(db, 'users'));
         const list: UserDoc[] = [];
         usersSnap.forEach((d) => {
@@ -68,7 +69,6 @@ export default function AdminMembersPage() {
         });
         setUsers(list);
 
-        // Pending applications count (from pending_verifications)
         const pendingQ = query(
           collection(db, 'pending_verifications'),
           where('emailConfirmed', '==', true)
@@ -106,6 +106,40 @@ export default function AdminMembersPage() {
     }
     if (isNaN(date.getTime())) return '-';
     return date.toLocaleDateString('sv-SE');
+  };
+
+  const handleDeleteUser = async (u: UserDoc) => {
+    if (
+      !confirm(
+        `Radera ${u.name} permanent?\n\nDetta tar bort:\n- Inloggning (Firebase Auth)\n- Användarprofil (Firestore)\n\nDetta kan inte ångras.`
+      )
+    )
+      return;
+
+    setActionLoading(u.id);
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: u.id,
+          email: u.email,
+          adminUid: user?.id || null,
+          adminName: user?.name || 'Admin',
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Server error');
+      }
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+      alert(`${u.name} har raderats.`);
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      alert('Kunde inte radera användaren');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const admins = users.filter((u) => u.role === 'ADMIN');
@@ -328,12 +362,15 @@ export default function AdminMembersPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-blue-900 uppercase tracking-wider">
                     Registrerad
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-blue-900 uppercase tracking-wider">
+                    Åtgärder
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-blue-200">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                       {searchTerm
                         ? `Inga matchningar för "${searchTerm}"`
                         : 'Inga användare i denna kategori.'}
@@ -387,6 +424,22 @@ export default function AdminMembersPage() {
                           <Calendar className="h-3 w-3 text-blue-600" />
                           {formatDate(u.approvedAt || u.createdAt)}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="border-2 border-red-400 bg-red-700 hover:bg-red-800"
+                          onClick={() => handleDeleteUser(u)}
+                          disabled={actionLoading === u.id}
+                          title="Radera permanent"
+                        >
+                          {actionLoading === u.id ? (
+                            '...'
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
                       </td>
                     </tr>
                   ))
