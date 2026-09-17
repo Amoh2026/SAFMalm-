@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getAuth, type Auth } from 'firebase-admin/auth';
 
 function initApp(): App {
   const existing = getApps();
@@ -21,6 +22,7 @@ function initApp(): App {
 }
 
 let _db: Firestore | null = null;
+let _auth: Auth | null = null;
 
 function getDb(): Firestore {
   if (!_db) {
@@ -28,6 +30,14 @@ function getDb(): Firestore {
     _db = getFirestore();
   }
   return _db;
+}
+
+export function adminAuth(): Auth {
+  if (!_auth) {
+    initApp();
+    _auth = getAuth();
+  }
+  return _auth;
 }
 
 export const adminDb = new Proxy({} as Firestore, {

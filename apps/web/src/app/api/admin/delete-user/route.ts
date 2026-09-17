@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuth } from 'firebase-admin/auth';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, adminAuth } from '@/lib/firebase/admin';
 
 export async function POST(request: Request) {
   try {
@@ -11,31 +10,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing uid' }, { status: 400 });
     }
 
-    const results: any = { auth: false, firestore: false, audit: false };
+    const results: any = {
+      auth: false,
+      firestore: false,
+      audit: false,
+    };
 
-    // 1. Delete from Firebase Authentication
     try {
-      await getAuth().deleteUser(uid);
+      await adminAuth().deleteUser(uid);
       results.auth = true;
     } catch (authErr: any) {
-      if (authErr.code === 'auth/user-not-found') {
+      if (authErr?.code === 'auth/user-not-found') {
         results.auth = 'not-found';
       } else {
         console.error('Auth delete failed:', authErr);
-        results.auth = 'error: ' + authErr.message;
+        results.auth = 'error: ' + (authErr?.message || String(authErr));
       }
     }
 
-    // 2. Delete from Firestore users
     try {
       await adminDb.collection('users').doc(uid).delete();
       results.firestore = true;
     } catch (fsErr: any) {
       console.error('Firestore delete failed:', fsErr);
-      results.firestore = 'error: ' + fsErr.message;
+      results.firestore = 'error: ' + (fsErr?.message || String(fsErr));
     }
 
-    // 3. Audit trail
     try {
       await adminDb.collection('deleted_users').add({
         originalUid: uid,
