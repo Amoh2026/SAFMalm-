@@ -24,7 +24,7 @@ function initApp(): App {
 let _db: Firestore | null = null;
 let _auth: Auth | null = null;
 
-function getDb(): Firestore {
+export function adminDb(): Firestore {
   if (!_db) {
     initApp();
     _db = getFirestore();
@@ -39,9 +39,3 @@ export function adminAuth(): Auth {
   }
   return _auth;
 }
-
-export const adminDb = new Proxy({} as Firestore, {
-  get(_target, prop) {
-    return (getDb() as any)[prop];
-  },
-});

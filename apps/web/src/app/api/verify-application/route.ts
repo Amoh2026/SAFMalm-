@@ -13,7 +13,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const ref = adminDb.collection('pending_verifications').doc(token);
+    const db = adminDb();
+    const ref = db.collection('pending_verifications').doc(token);
     const snap = await ref.get();
 
     if (!snap.exists) {
@@ -22,7 +23,6 @@ export async function GET(request: Request) {
 
     const data = snap.data()!;
 
-    // Expiry check
     if (data.expiresAt) {
       const expiresMs =
         typeof data.expiresAt.toMillis === 'function'
@@ -37,7 +37,6 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${siteUrl}/sv/verify-success?status=already`);
     }
 
-    // Mark confirmed — members is STILL untouched
     await ref.update({
       emailConfirmed: true,
       emailConfirmedAt: FieldValue.serverTimestamp(),

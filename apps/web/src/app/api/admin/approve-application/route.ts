@@ -12,7 +12,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid params' }, { status: 400 });
     }
 
-    const pendingRef = adminDb.collection('pending_verifications').doc(token);
+    const db = adminDb();
+    const pendingRef = db.collection('pending_verifications').doc(token);
     const snap = await pendingRef.get();
 
     if (!snap.exists) {
@@ -22,8 +23,7 @@ export async function POST(request: Request) {
     const data = snap.data()!;
 
     if (action === 'approve') {
-      // NOW write to members — first time data enters the real DB
-      const memberRef = await adminDb.collection('members').add({
+      const memberRef = await db.collection('members').add({
         name: data.name,
         email: data.email,
         phone: data.phone,
@@ -40,10 +40,8 @@ export async function POST(request: Request) {
         userAccountId: null,
       });
 
-      // Delete the temp doc
       await pendingRef.delete();
 
-      // Send approval email
       try {
         await sendApprovalEmail({ to: data.email, name: data.name });
       } catch (emailErr) {
@@ -53,7 +51,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, memberId: memberRef.id });
     }
 
-    // action === 'reject'
     await pendingRef.delete();
 
     try {
@@ -63,8 +60,11 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Admin approve error:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || 'Server error' },
+      { status: 500 }
+    );
   }
 }

@@ -10,6 +10,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing uid' }, { status: 400 });
     }
 
+    const db = adminDb();
     const results: any = {
       auth: false,
       firestore: false,
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      await adminDb.collection('users').doc(uid).delete();
+      await db.collection('users').doc(uid).delete();
       results.firestore = true;
     } catch (fsErr: any) {
       console.error('Firestore delete failed:', fsErr);
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      await adminDb.collection('deleted_users').add({
+      await db.collection('deleted_users').add({
         originalUid: uid,
         email: email || null,
         deletedAt: new Date(),

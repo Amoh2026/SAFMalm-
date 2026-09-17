@@ -16,9 +16,9 @@ export async function POST(request: Request) {
     }
 
     const emailLower = String(email).toLowerCase().trim();
+    const db = adminDb();
 
-    // Check pending_verifications for this email (unconfirmed)
-    const existingPending = await adminDb
+    const existingPending = await db
       .collection('pending_verifications')
       .where('email', '==', emailLower)
       .limit(1)
@@ -31,8 +31,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check members for an already-approved application with this email
-    const existingMember = await adminDb
+    const existingMember = await db
       .collection('members')
       .where('email', '==', emailLower)
       .where('status', '==', 'approved')
@@ -50,8 +49,7 @@ export async function POST(request: Request) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
-    // Write to TEMP collection — NOT members
-    await adminDb.collection('pending_verifications').doc(token).set({
+    await db.collection('pending_verifications').doc(token).set({
       name: name.trim(),
       email: emailLower,
       phone: phone.trim(),
@@ -72,7 +70,6 @@ export async function POST(request: Request) {
       });
     } catch (emailErr) {
       console.error('Confirmation email failed:', emailErr);
-      // Doc exists — user can request resend later
     }
 
     return NextResponse.json({
