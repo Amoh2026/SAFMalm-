@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
-import { Search, ArrowLeft, CheckCircle, XCircle, Calendar, Mail, User, Phone } from 'lucide-react';
+import { Search, ArrowLeft, CheckCircle, XCircle, Calendar, Mail, User, Phone, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase/client';
 import { collection, getDocs, updateDoc, doc, query, where, Timestamp } from 'firebase/firestore';
@@ -207,6 +207,34 @@ export default function AdminApplicationsPage() {
     } catch (err) {
       console.error('Error rejecting user:', err);
       alert('Kunde inte avvisa kontot');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteUser = async (u: UserAccount) => {
+    if (!confirm(`Radera ${u.name} permanent?\n\nDetta tar bort:\n- Inloggning (Firebase Auth)\n- Användarprofil\n\nDetta kan inte ångras.`)) return;
+    setActionLoading(u.id);
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: u.id,
+          email: u.email,
+          adminUid: user?.id || null,
+          adminName: user?.name || 'Admin',
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Server error');
+      }
+      setUserApps((prev) => prev.filter((a) => a.id !== u.id));
+      alert(`${u.name} har raderats.`);
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      alert('Kunde inte radera användaren');
     } finally {
       setActionLoading(null);
     }
@@ -450,6 +478,16 @@ export default function AdminApplicationsPage() {
                               disabled={actionLoading === u.id}
                             >
                               <XCircle className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="border-2 border-red-400 bg-red-700 hover:bg-red-800"
+                              onClick={() => handleDeleteUser(u)}
+                              disabled={actionLoading === u.id}
+                              title="Radera permanent"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </td>

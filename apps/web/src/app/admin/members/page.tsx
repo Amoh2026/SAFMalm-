@@ -45,27 +45,27 @@ export default function AdminMembersPage() {
         setLoading(true);
 
         // 1. Fetch APPROVED users
-        const approvedQuery = query(
-          collection(db, 'users'),
-          where('approved', '==', true)
-        );
-        const approvedSnap = await getDocs(approvedQuery);
+        // 1. Fetch APPROVED members (from `members` collection)
+const approvedQuery = query(
+  collection(db, 'members'),
+  where('status', '==', 'approved')
+);
+const approvedSnap = await getDocs(approvedQuery);
 
-        const approvedList: Member[] = [];
-        approvedSnap.forEach((docSnap) => {
-          const data = docSnap.data();
-          approvedList.push({
-            id: docSnap.id,
-            name: data.name || 'Okänd',
-            email: data.email || '',
-            role: data.role || 'MEMBER',
-            approved: true,
-            createdAt: data.createdAt || '',
-            approvedAt: data.approvedAt,
-            approvedBy: data.approvedBy,
-          });
-        });
-
+const approvedList: Member[] = [];
+approvedSnap.forEach((docSnap) => {
+  const data = docSnap.data();
+  approvedList.push({
+    id: docSnap.id,
+    name: data.name || 'Okänd',
+    email: data.email || '',
+    role: 'MEMBER',
+    approved: true,
+    createdAt: data.createdAt || '',
+    approvedAt: data.approvedAt,
+    approvedBy: data.approvedBy,
+  });
+});
         approvedList.sort((a, b) => {
           const aDate = a.approvedAt || a.createdAt;
           const bDate = b.approvedAt || b.createdAt;
@@ -119,21 +119,23 @@ export default function AdminMembersPage() {
   }
 
   if (!user) return null;
-const formatDate = (value: any) => {
-  if (!value) return '-';
-  let date: Date;
-  if (typeof value?.toDate === 'function') {
-    date = value.toDate();
-  } else if (typeof value === 'string') {
-    date = new Date(value);
-  } else if (typeof value === 'object' && 'seconds' in value) {
-    date = new Date(value.seconds * 1000);
-  } else {
-    return '-';
-  }
-  if (isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('sv-SE');
-};
+
+  const formatDate = (value: any) => {
+    if (!value) return '-';
+    let date: Date;
+    if (typeof value?.toDate === 'function') {
+      date = value.toDate();
+    } else if (typeof value === 'string') {
+      date = new Date(value);
+    } else if (typeof value === 'object' && 'seconds' in value) {
+      date = new Date(value.seconds * 1000);
+    } else {
+      return '-';
+    }
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('sv-SE');
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* Header */}
@@ -153,18 +155,28 @@ const formatDate = (value: any) => {
           </h1>
         </div>
 
-        <Button
-          className="bg-yellow-600 hover:bg-yellow-700 text-white relative border-2 border-yellow-400 hover:border-yellow-500"
-          onClick={() => router.push('/admin/members/applications')}
-        >
-          <FileText className="h-4 w-4 mr-2" />
-          <span className="mr-6">Medlemsansökningar</span>
-          {pendingCount > 0 && (
-            <span className="absolute top-1/2 -translate-y-1/2 right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
-              {pendingCount}
-            </span>
-          )}
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            className="bg-green-600 hover:bg-green-700 text-white border-2 border-green-400 hover:border-green-500"
+            onClick={() => router.push('/admin/members/approved')}
+          >
+            <UserCheck className="h-4 w-4 mr-2" />
+            Godkända medlemmar
+          </Button>
+
+          <Button
+            className="bg-yellow-600 hover:bg-yellow-700 text-white relative border-2 border-yellow-400 hover:border-yellow-500"
+            onClick={() => router.push('/admin/members/applications')}
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            <span className="mr-6">Medlemsansökningar</span>
+            {pendingCount > 0 && (
+              <span className="absolute top-1/2 -translate-y-1/2 right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                {pendingCount}
+              </span>
+            )}
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -275,12 +287,12 @@ const formatDate = (value: any) => {
                           {member.role}
                         </span>
                       </td>
-                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-  <div className="flex items-center gap-1">
-    <Calendar className="h-3 w-3 text-green-600" />
-    {formatDate(member.approvedAt || member.createdAt)}
-  </div>
-</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-green-600" />
+                          {formatDate(member.approvedAt || member.createdAt)}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}

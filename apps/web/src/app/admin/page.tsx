@@ -44,16 +44,23 @@ export default function AdminDashboard() {
       try {
         setLoading(true);
         
-        // 1. Fetch total members
-        const membersSnapshot = await getDocs(collection(db, 'members'));
+        // 1. Total members = approved members in `members`
+        const membersQuery = query(
+          collection(db, 'members'),
+          where('status', '==', 'approved')
+        );
+        const membersSnapshot = await getDocs(membersQuery);
         const totalMembers = membersSnapshot.size;
         
-        // 2. Fetch pending applications
-        const pendingQuery = query(collection(db, 'members'), where('status', '==', 'pending'));
+        // 2. Pending applications = confirmed emails in `pending_verifications`
+        const pendingQuery = query(
+          collection(db, 'pending_verifications'),
+          where('emailConfirmed', '==', true)
+        );
         const pendingSnapshot = await getDocs(pendingQuery);
         const pendingApplications = pendingSnapshot.size;
         
-        // 3. Fetch upcoming events
+        // 3. Upcoming events
         let upcomingEvents = 0;
         try {
           const eventsSnapshot = await getDocs(collection(db, 'events'));
@@ -62,7 +69,7 @@ export default function AdminDashboard() {
           console.log('No events collection yet');
         }
         
-        // 4. Fetch unread messages
+        // 4. Unread messages
         let unreadMessages = 0;
         try {
           const messagesQuery = query(collection(db, 'messages'), where('read', '==', false));
@@ -79,12 +86,11 @@ export default function AdminDashboard() {
           unreadMessages
         });
 
-        // 5. Fetch recent activity
+        // 5. Recent activity — from both collections
         const activities: any[] = [];
-        
-        const recentSnapshot = await getDocs(
-          query(collection(db, 'members'), where('status', '==', 'pending'))
-        );
+
+        // Pending from pending_verifications
+        const recentSnapshot = await getDocs(pendingQuery);
         recentSnapshot.forEach((doc) => {
           const data = doc.data();
           activities.push({
@@ -93,11 +99,19 @@ export default function AdminDashboard() {
             name: data.name || 'Unknown',
             action: 'Ny medlemsansökan',
             status: 'Väntar',
-            time: data.createdAt ? new Date(data.createdAt).toLocaleDateString('sv-SE') : 'Nyligen'
+            time: data.createdAt
+              ? new Date(
+                  data.createdAt.toDate ? data.createdAt.toDate() : data.createdAt
+                ).toLocaleDateString('sv-SE')
+              : 'Nyligen',
           });
         });
-        
-        const approvedQuery = query(collection(db, 'members'), where('status', '==', 'approved'));
+
+        // Approved from members
+        const approvedQuery = query(
+          collection(db, 'members'),
+          where('status', '==', 'approved')
+        );
         const approvedSnapshot = await getDocs(approvedQuery);
         approvedSnapshot.forEach((doc) => {
           const data = doc.data();
@@ -107,7 +121,11 @@ export default function AdminDashboard() {
             name: data.name || 'Unknown',
             action: 'Medlem godkänd',
             status: 'Godkänd',
-            time: data.approvedAt ? new Date(data.approvedAt).toLocaleDateString('sv-SE') : 'Nyligen'
+            time: data.approvedAt
+              ? new Date(
+                  data.approvedAt.toDate ? data.approvedAt.toDate() : data.approvedAt
+                ).toLocaleDateString('sv-SE')
+              : 'Nyligen',
           });
         });
         
@@ -117,10 +135,10 @@ export default function AdminDashboard() {
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         setStats({
-          totalMembers: 156,
-          pendingApplications: 12,
-          upcomingEvents: 3,
-          unreadMessages: 8
+          totalMembers: 0,
+          pendingApplications: 0,
+          upcomingEvents: 0,
+          unreadMessages: 0
         });
       } finally {
         setLoading(false);
