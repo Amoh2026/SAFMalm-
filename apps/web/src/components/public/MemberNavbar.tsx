@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogOut, Home, Calendar, User, Settings, BookOpen, Shield, LayoutDashboard } from 'lucide-react';
+import { LogOut, Home, Calendar, User, Settings, BookOpen, Shield, LayoutDashboard, MessagesSquare } from 'lucide-react';
 
 export function MemberNavbar() {
   const pathname = usePathname();
@@ -21,12 +21,13 @@ export function MemberNavbar() {
   };
 
   const navItems = [
-    { href: '/member/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/member/dashboard/boka', label: 'Boka', icon: BookOpen },
-    { href: '/member/contact', label: 'Kontakt', icon: Home },
-    { href: '/member/profile', label: 'Profil', icon: User },
-    { href: '/member/settings', label: 'Inställningar', icon: Settings },
-  ];
+  { href: '/member/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/member/chat', label: 'Chatt', icon: MessagesSquare },
+  { href: '/member/dashboard/boka', label: 'Boka', icon: BookOpen },
+  { href: '/member/contact', label: 'Kontakt', icon: Home },
+  { href: '/member/profile', label: 'Profil', icon: User },
+  { href: '/member/settings', label: 'Inställningar', icon: Settings },
+];
 
   return (
     <nav className="bg-blue-900 border-b-4 border-yellow-500 shadow-lg sticky top-0 z-50">

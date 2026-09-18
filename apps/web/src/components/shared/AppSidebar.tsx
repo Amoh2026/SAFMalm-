@@ -16,6 +16,7 @@ import {
   Shield,
   ClipboardList,
   MessageSquare,
+  MessagesSquare,
   Image as ImageIcon,
   Menu,
   X,
@@ -53,23 +54,23 @@ export function AppSidebar() {
   };
 
   // Admin menu items
- const adminItems = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/admin/members', label: 'Medlemmar', icon: Users, exact: true },
-  { href: '/admin/members/applications', label: 'Ansökningar', icon: ClipboardList },
-  { href: '/admin/bookings', label: 'Bokningar', icon: CalendarCheck },
-  { href: '/admin/events', label: 'Evenemang', icon: Calendar },
-  { href: '/admin/posts', label: 'Inlägg', icon: FileText },
-  { href: '/admin/files', label: 'Filer', icon: ImageIcon },
-  // 👇 ADD THIS NEW LINE
-  { href: '/admin/culture-media', label: 'Kulturmedia', icon: ImageIcon },
-  { href: '/admin/messages', label: 'Meddelanden', icon: MessageSquare },
-  { href: '/admin/settings', label: 'Inställningar', icon: Settings },
-];
+  const adminItems = [
+    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+    { href: '/admin/members', label: 'Medlemmar', icon: Users, exact: true },
+    { href: '/admin/members/applications', label: 'Ansökningar', icon: ClipboardList },
+    { href: '/admin/bookings', label: 'Bokningar', icon: CalendarCheck },
+    { href: '/admin/events', label: 'Evenemang', icon: Calendar },
+    { href: '/admin/posts', label: 'Inlägg', icon: FileText },
+    { href: '/admin/files', label: 'Filer', icon: ImageIcon },
+    { href: '/admin/culture-media', label: 'Kulturmedia', icon: ImageIcon },
+    { href: '/admin/messages', label: 'Meddelanden', icon: MessageSquare },
+    { href: '/admin/settings', label: 'Inställningar', icon: Settings },
+  ];
 
   // Member menu items — used both in the member sidebar and in the admin dropdown
   const memberItems = [
     { href: '/member/dashboard', label: 'Hem', icon: Home },
+    { href: '/member/chat', label: 'Chatt', icon: MessagesSquare },
     { href: '/member/boka', label: 'Boka lokal', icon: CalendarCheck },
     { href: '/member/contact', label: 'Meddelanden', icon: MessageSquare },
     { href: '/member/profile', label: 'Min profil', icon: User },
