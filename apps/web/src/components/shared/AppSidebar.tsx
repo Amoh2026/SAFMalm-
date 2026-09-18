@@ -25,21 +25,35 @@ import {
   Home,
   User,
 } from 'lucide-react';
+import { SidebarChatList } from '@/components/chat/SidebarChatList';
+import { useChatSidebar } from '@/hooks/useChatSidebar';
+import { PendingBadge } from '@/components/chat/PendingBadge';
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+
+  const { totalPending } = useChatSidebar(user?.id);
 
   useEffect(() => {
     setIsMobileOpen(false);
   }, [pathname]);
 
-  // Auto-open the Members dropdown when on a member page (for admins)
+  // Auto-open Members dropdown for admins on member pages
   useEffect(() => {
     if (isAdmin && pathname?.startsWith('/member')) {
       setMembersOpen(true);
+    }
+  }, [pathname, isAdmin]);
+
+  // Auto-open Chat sub-list when on a chat page
+  useEffect(() => {
+    if (pathname?.startsWith('/member/chat')) {
+      setChatOpen(true);
+      if (isAdmin) setMembersOpen(true);
     }
   }, [pathname, isAdmin]);
 
@@ -67,10 +81,10 @@ export function AppSidebar() {
     { href: '/admin/settings', label: 'Inställningar', icon: Settings },
   ];
 
-  // Member menu items — used both in the member sidebar and in the admin dropdown
+  // Member menu items (with chat as a special expandable item)
   const memberItems = [
     { href: '/member/dashboard', label: 'Hem', icon: Home },
-    { href: '/member/chat', label: 'Chatt', icon: MessagesSquare },
+    { href: '/member/chat', label: 'Chatt', icon: MessagesSquare, expandable: true },
     { href: '/member/boka', label: 'Boka lokal', icon: CalendarCheck },
     { href: '/member/contact', label: 'Meddelanden', icon: MessageSquare },
     { href: '/member/profile', label: 'Min profil', icon: User },
@@ -166,20 +180,48 @@ export function AppSidebar() {
                       {memberItems.map((item) => {
                         const Icon = item.icon;
                         const active = isActive(item.href);
+                        const isChat = item.href === '/member/chat';
+                        const expandable = isChat;
+
                         return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            onClick={() => setIsMobileOpen(false)}
-                            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition text-sm ${
-                              active
-                                ? 'bg-yellow-500 text-blue-900 font-medium'
-                                : 'text-blue-100 hover:bg-blue-800'
-                            }`}
-                          >
-                            <Icon className="h-4 w-4" />
-                            <span>{item.label}</span>
-                          </Link>
+                          <div key={item.href}>
+                            <div className="flex items-center">
+                              <Link
+                                href={item.href}
+                                onClick={() => setIsMobileOpen(false)}
+                                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition text-sm flex-1 ${
+                                  active && !expandable
+                                    ? 'bg-yellow-500 text-blue-900 font-medium'
+                                    : 'text-blue-100 hover:bg-blue-800'
+                                }`}
+                              >
+                                <Icon className="h-4 w-4" />
+                                <span>{item.label}</span>
+                                {isChat && totalPending > 0 && (
+                                  <PendingBadge count={totalPending} className="ml-auto" />
+                                )}
+                              </Link>
+                              {expandable && (
+                                <button
+                                  onClick={() => setChatOpen(!chatOpen)}
+                                  className="p-1 rounded hover:bg-blue-800 transition"
+                                  aria-label="Toggle chat rooms"
+                                >
+                                  {chatOpen ? (
+                                    <ChevronDown className="h-3 w-3 text-blue-100" />
+                                  ) : (
+                                    <ChevronRight className="h-3 w-3 text-blue-100" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                            {expandable && chatOpen && (
+                              <SidebarChatList
+                                userId={user?.id}
+                                onNavigate={() => setIsMobileOpen(false)}
+                              />
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -187,10 +229,55 @@ export function AppSidebar() {
                 </div>
               </>
             ) : (
-              /* Member — just the member menu items */
+              /* Member — member menu items with chat as expandable */
               memberItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
+                const isChat = item.href === '/member/chat';
+
+                if (isChat) {
+                  return (
+                    <div key={item.href}>
+                      <div className="flex items-center">
+                        <Link
+                          href={item.href}
+                          onClick={() => setIsMobileOpen(false)}
+                          className={`flex items-center gap-3 px-4 py-3 rounded-lg transition flex-1 ${
+                            active
+                              ? 'bg-yellow-500 text-blue-900 font-medium shadow-lg'
+                              : 'text-white hover:bg-blue-800'
+                          }`}
+                        >
+                          <Icon className={`h-5 w-5 ${active ? 'text-blue-900' : ''}`} />
+                          <span>{item.label}</span>
+                          {totalPending > 0 && (
+                            <PendingBadge count={totalPending} className="ml-auto" />
+                          )}
+                        </Link>
+                        <button
+                          onClick={() => setChatOpen(!chatOpen)}
+                          className={`p-2 rounded transition ${
+                            active ? 'text-blue-900 hover:bg-yellow-400' : 'text-white hover:bg-blue-800'
+                          }`}
+                          aria-label="Toggle chat rooms"
+                        >
+                          {chatOpen ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      {chatOpen && (
+                        <SidebarChatList
+                          userId={user?.id}
+                          onNavigate={() => setIsMobileOpen(false)}
+                        />
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <Link
                     key={item.href}

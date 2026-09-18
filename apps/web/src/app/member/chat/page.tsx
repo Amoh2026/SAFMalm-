@@ -2,6 +2,7 @@
 
 // ============================================================
 // /member/chat — room list page
+// v2 — passes currentUserId to RoomCard (for owner badge)
 // ============================================================
 
 import { useEffect } from 'react';
@@ -70,7 +71,12 @@ export default function ChatListPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {rooms.map((r) => (
-              <RoomCard key={r.id} room={r} t={t} />
+              <RoomCard
+                key={r.id}
+                room={r}
+                currentUserId={user.id}
+                t={t}
+              />
             ))}
           </div>
         )}
