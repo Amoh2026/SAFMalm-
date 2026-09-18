@@ -1,7 +1,8 @@
 'use client';
 
 // ============================================================
-// VideoPanel — LiveKit video grid (dynamic, safe-fails)
+// VideoPanel — LiveKit video grid + document sharing
+// v2 — integrates shared document viewer
 // ============================================================
 
 import { useEffect, useState } from 'react';
@@ -14,6 +15,10 @@ import {
   RoomAudioRenderer,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
+
+import { useSharedDocs } from '@/hooks/useSharedDocs';
+import { ShareDocDialog } from './ShareDocDialog';
+import { SharedDocViewer } from './SharedDocViewer';
 
 interface Props {
   roomId: string;
@@ -34,6 +39,10 @@ export function VideoPanel({ roomId, userId, userName, t }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Shared docs (real-time)
+  const { docs } = useSharedDocs(roomId);
+  const activeDoc = docs[0] ?? null;
+
   useEffect(() => {
     let cancelled = false;
     async function fetchToken() {
@@ -42,9 +51,7 @@ export function VideoPanel({ roomId, userId, userName, t }: Props) {
         setError(null);
 
         const currentUser = auth.currentUser;
-        if (!currentUser) {
-          throw new Error('Not signed in');
-        }
+        if (!currentUser) throw new Error('Not signed in');
         const idToken = await currentUser.getIdToken();
 
         const res = await fetch('/api/chat/livekit-token', {
@@ -95,22 +102,52 @@ export function VideoPanel({ roomId, userId, userName, t }: Props) {
   }
 
   return (
-    <div className="h-[420px] bg-black">
-      <LiveKitRoom
-        token={state.token}
-        serverUrl={state.url}
-        connect={true}
-        video={false}
-        audio={false}
-        onDisconnected={() => {
-          console.log('LiveKit disconnected');
-        }}
-        data-lk-theme="default"
-        style={{ height: '100%' }}
-      >
-        <VideoConference />
-        <RoomAudioRenderer />
-      </LiveKitRoom>
+    <div className="flex flex-col h-[520px] bg-black">
+      {/* Main content: video + shared doc */}
+      <div className="flex-1 flex min-h-0">
+        {/* Video area */}
+        <div
+          className={`${
+            activeDoc ? 'w-1/3 min-w-[200px]' : 'flex-1'
+          } bg-black border-r border-gray-800 transition-all`}
+        >
+          <LiveKitRoom
+            token={state.token}
+            serverUrl={state.url}
+            connect={true}
+            video={false}
+            audio={false}
+            onDisconnected={() => {
+              console.log('LiveKit disconnected');
+            }}
+            data-lk-theme="default"
+            style={{ height: '100%' }}
+          >
+            <VideoConference />
+            <RoomAudioRenderer />
+          </LiveKitRoom>
+        </div>
+
+        {/* Shared doc viewer */}
+        {activeDoc && (
+          <div className="flex-1 min-w-0">
+            <SharedDocViewer
+              doc={activeDoc}
+              isSharer={activeDoc.sharedBy === userId}
+              onClose={() => {
+                // Just hide locally — actual revoke goes through DELETE API
+                // (only sharer sees the Stop Sharing button)
+              }}
+              t={t}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Bottom toolbar — Share document */}
+      <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-900 border-t border-gray-800">
+        <ShareDocDialog roomId={roomId} t={t} />
+      </div>
     </div>
   );
 }
