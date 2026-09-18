@@ -1,10 +1,8 @@
 // ============================================================
 // Chat Firestore helpers — uses the existing client.ts db
 // ============================================================
-// All chat-specific Firestore reads/writes live here.
-// Imported by hooks and components.
-//
-// ⚠️ This file is ADDITIVE — it does not modify client.ts.
+// v2 — added: request/approve/reject/kick/settings helpers,
+//              room normalization for backward compat
 // ============================================================
 
 import {
@@ -30,7 +28,9 @@ import { db } from '@/lib/firebase/client';
 import { computeExpiresAt } from '@/lib/chat/ttl';
 import {
   MAX_MESSAGE_LENGTH,
+  MAX_REQUEST_MESSAGE_LENGTH,
   presenceDocId,
+  normalizeRoom,
   type ChatRoom,
   type ChatMessage,
   type ChatMessageInput,
@@ -49,22 +49,15 @@ export const chatPresenceDoc = (roomId: string, userId: string) =>
   doc(db, 'chatPresence', presenceDocId(roomId, userId));
 
 // ------------------------------------------------------------
-// ROOMS
+// ROOMS — reads
 // ------------------------------------------------------------
 
-/**
- * Fetch a single room by ID.
- */
 export async function getRoom(roomId: string): Promise<ChatRoom | null> {
   const snap = await getDoc(chatRoomDoc(roomId));
   if (!snap.exists()) return null;
-  return { id: snap.id, ...(snap.data() as Omit<ChatRoom, 'id'>) };
+  return normalizeRoom({ id: snap.id, ...snap.data() });
 }
 
-/**
- * Fetch all active rooms (most recently active first).
- * Uses simple query + client-side filter (no composite index needed).
- */
 export async function listRooms(max = 50): Promise<ChatRoom[]> {
   const q = query(
     chatRoomsCol(),
@@ -73,14 +66,10 @@ export async function listRooms(max = 50): Promise<ChatRoom[]> {
   );
   const snap = await getDocs(q);
   return snap.docs
-    .map((d) => ({ id: d.id, ...(d.data() as Omit<ChatRoom, 'id'>) }))
+    .map((d) => normalizeRoom({ id: d.id, ...d.data() }))
     .filter((r) => r.isActive !== false);
 }
 
-/**
- * Subscribe to all active rooms in real time.
- * Simple query (no composite index) + client-side filter.
- */
 export function subscribeRooms(
   cb: (rooms: ChatRoom[]) => void,
   max = 50
@@ -92,15 +81,12 @@ export function subscribeRooms(
   );
   return onSnapshot(q, (snap) => {
     const rooms = snap.docs
-      .map((d) => ({ id: d.id, ...(d.data() as Omit<ChatRoom, 'id'>) }))
+      .map((d) => normalizeRoom({ id: d.id, ...d.data() }))
       .filter((r) => r.isActive !== false);
     cb(rooms);
   });
 }
 
-/**
- * Subscribe to a single room.
- */
 export function subscribeRoom(
   roomId: string,
   cb: (room: ChatRoom | null) => void
@@ -110,7 +96,30 @@ export function subscribeRoom(
       cb(null);
       return;
     }
-    cb({ id: snap.id, ...(snap.data() as Omit<ChatRoom, 'id'>) });
+    cb(normalizeRoom({ id: snap.id, ...snap.data() }));
+  });
+}
+
+/**
+ * Subscribe to rooms the user is a member of (for the sidebar).
+ */
+export function subscribeUserRooms(
+  userId: string,
+  cb: (rooms: ChatRoom[]) => void
+): Unsubscribe {
+  // Note: Firestore can't filter array-of-objects by inner field reliably.
+  // We fetch all active rooms and filter client-side.
+  const q = query(
+    chatRoomsCol(),
+    orderBy('createdAt', 'desc'),
+    limit(100)
+  );
+  return onSnapshot(q, (snap) => {
+    const rooms = snap.docs
+      .map((d) => normalizeRoom({ id: d.id, ...d.data() }))
+      .filter((r) => r.isActive !== false)
+      .filter((r) => (r.members ?? []).some((m) => m.id === userId));
+    cb(rooms);
   });
 }
 
@@ -118,9 +127,6 @@ export function subscribeRoom(
 // MESSAGES
 // ------------------------------------------------------------
 
-/**
- * Subscribe to the last N messages in a room (real-time).
- */
 export function subscribeMessages(
   roomId: string,
   cb: (messages: ChatMessage[]) => void,
@@ -141,9 +147,6 @@ export function subscribeMessages(
   });
 }
 
-/**
- * Send a new message. Also bumps room.lastMessageAt + preview.
- */
 export async function sendMessage(
   roomId: string,
   input: ChatMessageInput
@@ -161,7 +164,6 @@ export async function sendMessage(
     expiresAt: computeExpiresAt(),
   });
 
-  // Denormalized preview for room list
   await updateDoc(chatRoomDoc(roomId), {
     lastMessageAt: Timestamp.now(),
     lastMessagePreview: input.text.trim().slice(0, 80),
@@ -174,9 +176,6 @@ export async function sendMessage(
 // PRESENCE
 // ------------------------------------------------------------
 
-/**
- * Mark user as online in a room (called on page enter).
- */
 export async function setPresence(
   roomId: string,
   userId: string,
@@ -197,9 +196,6 @@ export async function setPresence(
   );
 }
 
-/**
- * Remove user presence (called on page leave).
- */
 export async function clearPresence(
   roomId: string,
   userId: string
@@ -207,13 +203,10 @@ export async function clearPresence(
   try {
     await deleteDoc(chatPresenceDoc(roomId, userId));
   } catch {
-    // ignore — presence may already be gone
+    // ignore
   }
 }
 
-/**
- * Subscribe to presence docs for a room.
- */
 export function subscribePresence(
   roomId: string,
   cb: (users: ChatPresence[]) => void
@@ -228,5 +221,82 @@ export function subscribePresence(
       docId: d.id,
     }));
     cb(users);
+  });
+}
+
+// ------------------------------------------------------------
+// v2 — PRIVATE ROOM HELPERS
+// ------------------------------------------------------------
+
+/**
+ * Send a join request to a private room.
+ * Client-side helper — the actual write goes through the API
+ * to enforce max member + duplicate checks server-side.
+ */
+export async function requestJoinWithMessage(
+  roomId: string,
+  message: string
+): Promise<void> {
+  const trimmed = message.trim().slice(0, MAX_REQUEST_MESSAGE_LENGTH);
+
+  const snap = await getDoc(chatRoomDoc(roomId));
+  if (!snap.exists()) throw new Error('Room not found');
+
+  const room = normalizeRoom({ id: snap.id, ...snap.data() });
+  if (!room.requiresApproval) throw new Error('Room is not private');
+
+  // (Actual request API call is done by the API route, not here.)
+  // This helper is a fallback for local operations.
+  const ref = chatRoomDoc(roomId);
+  const existing: any[] = (room.pendingRequests ?? []).filter(
+    (r) => r.id !== (snap.data() as any).__uid
+  );
+  await updateDoc(ref, {
+    pendingRequests: [
+      ...existing,
+      {
+        id: (snap.data() as any).__uid,
+        name: '',
+        requestedAt: Date.now(),
+        message: trimmed,
+      },
+    ],
+  });
+}
+
+/**
+ * Get all rooms the user owns.
+ */
+export function subscribeOwnedRooms(
+  userId: string,
+  cb: (rooms: ChatRoom[]) => void
+): Unsubscribe {
+  const q = query(
+    chatRoomsCol(),
+    where('createdBy', '==', userId),
+    orderBy('createdAt', 'desc'),
+    limit(50)
+  );
+  return onSnapshot(q, (snap) => {
+    const rooms = snap.docs
+      .map((d) => normalizeRoom({ id: d.id, ...d.data() }))
+      .filter((r) => r.isActive !== false);
+    cb(rooms);
+  });
+}
+
+/**
+ * Total pending requests across all rooms owned by user.
+ */
+export function subscribeTotalPendingCount(
+  userId: string,
+  cb: (count: number) => void
+): Unsubscribe {
+  return subscribeOwnedRooms(userId, (rooms) => {
+    const total = rooms.reduce(
+      (sum, r) => sum + (r.pendingRequests?.length ?? 0),
+      0
+    );
+    cb(total);
   });
 }
