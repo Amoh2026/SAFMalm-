@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Menu, X, Shield, Users } from 'lucide-react';
+import { Menu, X, Shield, Users, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/providers/LanguageProvider';
@@ -138,18 +138,18 @@ export function Navbar() {
 
             {canAccessMember && (
               <Link
-                href="/member/dashboard"
+                href="/member/chat"
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold text-sm transition whitespace-nowrap ${
-                  pathname?.startsWith('/member')
+                  pathname?.startsWith('/member/chat')
                     ? 'bg-yellow-500 text-blue-900 border-2 border-yellow-400'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white border-2 border-blue-400 hover:border-yellow-400'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white border-2 border-indigo-400 hover:border-yellow-400'
                 }`}
+                title="Chatt"
               >
-                <Users className="h-4 w-4" />
-                <span className="hidden 2xl:inline">Members</span>
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Chatt</span>
               </Link>
             )}
-
             {isAdmin && (
               <Link
                 href="/admin"
@@ -260,18 +260,18 @@ export function Navbar() {
                 </span>
               </Link>
 
-              {canAccessMember && (
+             {canAccessMember && (
                 <Link
-                  href="/member/dashboard"
+                  href="/member/chat"
                   onClick={() => setIsOpen(false)}
                   className={`flex items-center gap-3 py-2 px-3 rounded-lg transition ${
-                    pathname?.startsWith('/member')
+                    pathname?.startsWith('/member/chat')
                       ? 'bg-blue-800 text-yellow-400 border-l-4 border-yellow-500'
                       : 'text-white hover:bg-blue-800'
                   }`}
                 >
-                  <Users className="h-5 w-5 text-yellow-400" />
-                  <span>Members</span>
+                  <MessageSquare className="h-5 w-5 text-yellow-400" />
+                  <span>Chatt</span>
                 </Link>
               )}
 
