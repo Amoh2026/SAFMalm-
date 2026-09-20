@@ -1,8 +1,7 @@
 // ============================================================
 // Chat Firestore helpers — uses the existing client.ts db
 // ============================================================
-// v2 — added: request/approve/reject/kick/settings helpers,
-//              room normalization for backward compat
+// v4 — added room session tracking helpers
 // ============================================================
 
 import {
@@ -19,6 +18,8 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  arrayUnion,
+  arrayRemove,
   Timestamp,
   where,
   type Unsubscribe,
@@ -29,6 +30,7 @@ import { computeExpiresAt } from '@/lib/chat/ttl';
 import {
   MAX_MESSAGE_LENGTH,
   MAX_REQUEST_MESSAGE_LENGTH,
+  SESSION_HEARTBEAT_MS,
   presenceDocId,
   normalizeRoom,
   type ChatRoom,
@@ -59,11 +61,7 @@ export async function getRoom(roomId: string): Promise<ChatRoom | null> {
 }
 
 export async function listRooms(max = 50): Promise<ChatRoom[]> {
-  const q = query(
-    chatRoomsCol(),
-    orderBy('createdAt', 'desc'),
-    limit(max)
-  );
+  const q = query(chatRoomsCol(), orderBy('createdAt', 'desc'), limit(max));
   const snap = await getDocs(q);
   return snap.docs
     .map((d) => normalizeRoom({ id: d.id, ...d.data() }))
@@ -74,11 +72,7 @@ export function subscribeRooms(
   cb: (rooms: ChatRoom[]) => void,
   max = 50
 ): Unsubscribe {
-  const q = query(
-    chatRoomsCol(),
-    orderBy('createdAt', 'desc'),
-    limit(max)
-  );
+  const q = query(chatRoomsCol(), orderBy('createdAt', 'desc'), limit(max));
   return onSnapshot(q, (snap) => {
     const rooms = snap.docs
       .map((d) => normalizeRoom({ id: d.id, ...d.data() }))
@@ -100,20 +94,11 @@ export function subscribeRoom(
   });
 }
 
-/**
- * Subscribe to rooms the user is a member of (for the sidebar).
- */
 export function subscribeUserRooms(
   userId: string,
   cb: (rooms: ChatRoom[]) => void
 ): Unsubscribe {
-  // Note: Firestore can't filter array-of-objects by inner field reliably.
-  // We fetch all active rooms and filter client-side.
-  const q = query(
-    chatRoomsCol(),
-    orderBy('createdAt', 'desc'),
-    limit(100)
-  );
+  const q = query(chatRoomsCol(), orderBy('createdAt', 'desc'), limit(100));
   return onSnapshot(q, (snap) => {
     const rooms = snap.docs
       .map((d) => normalizeRoom({ id: d.id, ...d.data() }))
@@ -225,47 +210,85 @@ export function subscribePresence(
 }
 
 // ------------------------------------------------------------
-// v2 — PRIVATE ROOM HELPERS
+// v4 — SESSION TRACKING (for private room visibility)
 // ------------------------------------------------------------
 
 /**
- * Send a join request to a private room.
- * Client-side helper — the actual write goes through the API
- * to enforce max member + duplicate checks server-side.
+ * Add current user to the room's session occupants.
+ * Called when the user enters the room page.
  */
-export async function requestJoinWithMessage(
+export async function enterRoomSession(
   roomId: string,
-  message: string
+  userId: string
 ): Promise<void> {
-  const trimmed = message.trim().slice(0, MAX_REQUEST_MESSAGE_LENGTH);
-
-  const snap = await getDoc(chatRoomDoc(roomId));
-  if (!snap.exists()) throw new Error('Room not found');
-
-  const room = normalizeRoom({ id: snap.id, ...snap.data() });
-  if (!room.requiresApproval) throw new Error('Room is not private');
-
-  // (Actual request API call is done by the API route, not here.)
-  // This helper is a fallback for local operations.
-  const ref = chatRoomDoc(roomId);
-  const existing: any[] = (room.pendingRequests ?? []).filter(
-    (r) => r.id !== (snap.data() as any).__uid
-  );
-  await updateDoc(ref, {
-    pendingRequests: [
-      ...existing,
-      {
-        id: (snap.data() as any).__uid,
-        name: '',
-        requestedAt: Date.now(),
-        message: trimmed,
-      },
-    ],
-  });
+  try {
+    await updateDoc(chatRoomDoc(roomId), {
+      sessionOccupants: arrayUnion(userId),
+    });
+  } catch (err) {
+    console.error('enterRoomSession error:', err);
+  }
 }
 
 /**
- * Get all rooms the user owns.
+ * Remove current user from the room's session occupants.
+ * Called on unmount or page leave.
+ */
+export async function leaveRoomSession(
+  roomId: string,
+  userId: string
+): Promise<void> {
+  try {
+    await updateDoc(chatRoomDoc(roomId), {
+      sessionOccupants: arrayRemove(userId),
+    });
+  } catch (err) {
+    // Fails silently if the user is offline or doc deleted
+    console.error('leaveRoomSession error:', err);
+  }
+}
+
+/**
+ * Mark the current user (owner) as active in the room.
+ * Called when the owner opens the room.
+ */
+export async function setOwnerActive(
+  roomId: string,
+  active: boolean
+): Promise<void> {
+  try {
+    if (active) {
+      await updateDoc(chatRoomDoc(roomId), {
+        ownerIsActive: true,
+        ownerLastActiveAt: Timestamp.now(),
+      });
+    } else {
+      await updateDoc(chatRoomDoc(roomId), {
+        ownerIsActive: false,
+        ownerLastActiveAt: Timestamp.now(),
+      });
+    }
+  } catch (err) {
+    console.error('setOwnerActive error:', err);
+  }
+}
+
+/**
+ * Heartbeat — refresh ownerLastActiveAt while the owner is in the room.
+ * Call this every SESSION_HEARTBEAT_MS milliseconds while owner is on the page.
+ */
+export async function ownerHeartbeat(roomId: string): Promise<void> {
+  try {
+    await updateDoc(chatRoomDoc(roomId), {
+      ownerLastActiveAt: Timestamp.now(),
+    });
+  } catch {
+    // ignore transient errors
+  }
+}
+
+/**
+ * Subscribe to rooms the user owns (for the sidebar with pending count).
  */
 export function subscribeOwnedRooms(
   userId: string,
@@ -299,4 +322,35 @@ export function subscribeTotalPendingCount(
     );
     cb(total);
   });
+}
+
+/**
+ * Ensure the room's session fields are initialized.
+ * Called on room creation to set defaults.
+ */
+export async function ensureRoomSessionFields(roomId: string): Promise<void> {
+  try {
+    const ref = chatRoomDoc(roomId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const data = snap.data() as any;
+    const updates: Record<string, any> = {};
+
+    if (data.ownerIsActive === undefined) {
+      updates.ownerIsActive = false;
+    }
+    if (data.ownerLastActiveAt === undefined) {
+      updates.ownerLastActiveAt = null;
+    }
+    if (data.sessionOccupants === undefined) {
+      updates.sessionOccupants = [];
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(ref, updates);
+    }
+  } catch (err) {
+    console.error('ensureRoomSessionFields error:', err);
+  }
 }

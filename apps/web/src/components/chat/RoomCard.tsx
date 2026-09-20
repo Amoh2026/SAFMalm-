@@ -2,13 +2,18 @@
 
 // ============================================================
 // RoomCard — a single room in the room list
-// v2 — shows private lock, owner crown, pending badge
+// v3 — shows private room status badges (🌍 / 🔒 / 💤)
 // ============================================================
 
 import Link from 'next/link';
 import { MessageSquare, Users, Clock, Lock, Crown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { MAX_ROOM_MEMBERS, type ChatRoom } from '@/types/chat';
+import {
+  MAX_ROOM_MEMBERS,
+  getRoomStatus,
+  isUserOwner,
+  type ChatRoom,
+} from '@/types/chat';
 import { PendingBadge } from './PendingBadge';
 
 interface Props {
@@ -37,8 +42,33 @@ export function RoomCard({ room, currentUserId, t }: Props) {
   const max = room.maxMembers ?? MAX_ROOM_MEMBERS;
   const full = count >= max;
   const isPrivate = room.requiresApproval === true;
-  const isOwner = currentUserId && room.createdBy === currentUserId;
+  const isOwner = isUserOwner(room, currentUserId);
   const pendingCount = (room.pendingRequests ?? []).length;
+  const status = getRoomStatus(room);
+
+  // Status badge for private rooms
+  let statusBadge: React.ReactNode = null;
+  if (isPrivate) {
+    if (status === 'open') {
+      statusBadge = (
+        <span className="text-[10px] font-medium bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full shrink-0">
+          🌍 {t('chat.statusOpen') || 'Open'}
+        </span>
+      );
+    } else if (status === 'locked') {
+      statusBadge = (
+        <span className="text-[10px] font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full shrink-0">
+          🔒 {t('chat.statusLocked') || 'Locked'}
+        </span>
+      );
+    } else if (status === 'dormant') {
+      statusBadge = (
+        <span className="text-[10px] font-medium bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full shrink-0">
+          💤 {t('chat.statusDormant') || 'Inactive'}
+        </span>
+      );
+    }
+  }
 
   return (
     <Link href={`/member/chat/${room.id}`}>
@@ -72,11 +102,14 @@ export function RoomCard({ room, currentUserId, t }: Props) {
                 )}
               </div>
             </div>
-            {full && (
-              <span className="text-[10px] font-medium bg-red-100 text-red-700 px-2 py-0.5 rounded-full shrink-0">
-                {t('chat.roomFull')}
-              </span>
-            )}
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              {statusBadge}
+              {full && (
+                <span className="text-[10px] font-medium bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                  {t('chat.roomFull')}
+                </span>
+              )}
+            </div>
           </div>
 
           {room.lastMessagePreview && (

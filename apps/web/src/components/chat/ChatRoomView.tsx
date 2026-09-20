@@ -2,11 +2,12 @@
 
 // ============================================================
 // ChatRoomView — main chat layout (messages + presence + video)
-// v2 — handles pending state for private rooms
+// v4 — fixes owner access bug when ownerIsActive is false
 // ============================================================
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Clock, Lock } from 'lucide-react';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { PresenceList } from './PresenceList';
@@ -18,9 +19,10 @@ import { useChatPresence } from '@/hooks/useChatPresence';
 import { useLanguage } from '@/providers/LanguageProvider';
 import {
   hasPendingRequest,
+  canEnterRoom,
+  isOwnerActive,
   type ChatRoom,
 } from '@/types/chat';
-import { Clock } from 'lucide-react';
 
 interface Props {
   room: ChatRoom;
@@ -55,22 +57,34 @@ export function ChatRoomView({
 
   const isPrivate = room.requiresApproval === true;
   const userPending = hasPendingRequest(room, userId);
+  const ownerActive = isOwnerActive(room);
 
+  // 🆕 CRITICAL FIX: Owner is ALWAYS effectively a member of their own room
+  const effectiveIsMember = isMember || isCreator;
+
+  // Compute access state
+  const access = canEnterRoom(room, userId);
+
+  // Block only if: NOT effective member AND NOT allowed by access rules
+  const isBlocked = !effectiveIsMember && !access.allowed;
+
+  // Hooks always fire if user is effectively a member (includes owner)
   const { messages, loading: messagesLoading } = useChatMessages(
-    isMember ? roomId : null
+    effectiveIsMember ? roomId : null
   );
 
   const { users } = useChatPresence({
-    roomId: isMember ? roomId : null,
+    roomId: effectiveIsMember ? roomId : null,
     userId,
     userName,
+    isOwner: isCreator,
   });
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-lg border-2 border-gray-200 overflow-hidden">
       <RoomHeader
         room={room}
-        isMember={isMember}
+        isMember={effectiveIsMember}
         isCreator={isCreator}
         videoOpen={videoOpen}
         onToggleVideo={() => setVideoOpen((v) => !v)}
@@ -84,35 +98,47 @@ export function ChatRoomView({
       />
 
       {/* Non-member states */}
-      {!isMember ? (
+      {!effectiveIsMember ? (
         <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-8">
-          {isPrivate ? (
-            userPending ? (
-              // Pending approval
-              <>
-                <div className="bg-blue-100 text-blue-700 rounded-full p-4 mb-4">
-                  <Clock className="h-8 w-8" />
-                </div>
-                <p className="text-lg font-medium text-gray-700 mb-1">
-                  {t('chat.waitingForApproval')}
-                </p>
-                <p className="text-sm text-gray-500 text-center max-w-sm">
-                  {t('chat.waitingForApprovalDesc')}
-                </p>
-              </>
-            ) : (
-              // Not requested yet — show request button
-              <>
-                <p className="text-sm mb-4 text-center max-w-sm">
-                  {t('chat.privateRoomNotice')}
-                </p>
-                <RequestJoinDialog
-                  room={room}
-                  onRequested={onRefresh}
-                  t={t}
-                />
-              </>
-            )
+          {isBlocked ? (
+            // User cannot access this room at all
+            <>
+              <div className="bg-gray-100 text-gray-600 rounded-full p-4 mb-4">
+                <Lock className="h-8 w-8" />
+              </div>
+              <p className="text-lg font-medium text-gray-700 mb-1">
+                {t('chat.roomLocked') || 'Rummet är låst'}
+              </p>
+              <p className="text-sm text-gray-500 text-center max-w-sm">
+                {t('chat.roomLockedDesc') ||
+                  'Ägaren är inte tillgänglig just nu. Rummet är inte tillgängligt.'}
+              </p>
+            </>
+          ) : userPending ? (
+            // Pending approval
+            <>
+              <div className="bg-blue-100 text-blue-700 rounded-full p-4 mb-4">
+                <Clock className="h-8 w-8" />
+              </div>
+              <p className="text-lg font-medium text-gray-700 mb-1">
+                {t('chat.waitingForApproval')}
+              </p>
+              <p className="text-sm text-gray-500 text-center max-w-sm">
+                {t('chat.waitingForApprovalDesc')}
+              </p>
+            </>
+          ) : isPrivate ? (
+            // Private room, request to join
+            <>
+              <p className="text-sm mb-4 text-center max-w-sm">
+                {t('chat.privateRoomNotice')}
+              </p>
+              <RequestJoinDialog
+                room={room}
+                onRequested={onRefresh}
+                t={t}
+              />
+            </>
           ) : (
             // Public room — show join button
             <>
