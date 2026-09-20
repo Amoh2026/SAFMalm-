@@ -1,65 +1,44 @@
 // ============================================================
 // Chat Types — SAFiMalmo
-// ============================================================
-// All chat-related TypeScript types.
-// Matches the shape stored in Firestore.
-//
-// v2 — added: maxMembers, requiresApproval, pendingRequests,
-//              roomType, request message support
+// v3 — added SharedDocument for in-call document sharing
 // ============================================================
 
 import { Timestamp } from 'firebase/firestore';
 
-// ------------------------------------------------------------
-// Chat member (stored inside chatRooms/{id}.members[])
-// ------------------------------------------------------------
 export interface ChatMember {
-  id: string;          // Firebase Auth uid
-  name: string;        // Display name
-  email?: string;      // Optional — for admin queries
-  joinedAt: number;    // Date.now()
+  id: string;
+  name: string;
+  email?: string;
+  joinedAt: number;
 }
 
-// ------------------------------------------------------------
-// Pending join request (stored in chatRooms/{id}.pendingRequests[])
-// ------------------------------------------------------------
 export interface PendingRequest {
-  id: string;          // Firebase Auth uid
-  name: string;        // Display name
-  email?: string;      // Optional
-  requestedAt: number; // Date.now()
-  message?: string;    // Optional reason (max 200 chars)
+  id: string;
+  name: string;
+  email?: string;
+  requestedAt: number;
+  message?: string;
 }
 
-// ------------------------------------------------------------
-// Chat room document: chatRooms/{roomId}
-// ------------------------------------------------------------
 export type RoomType = 'public' | 'private';
 
 export interface ChatRoom {
   id: string;
   name: string;
   description: string;
-  createdBy: string;            // Firebase Auth uid (owner)
-  createdByName: string;        // Display name snapshot
+  createdBy: string;
+  createdByName: string;
   createdAt: Timestamp | null;
-  members: ChatMember[];        // Max = maxMembers
+  members: ChatMember[];
   isActive: boolean;
-  memberCount: number;          // Denormalized for quick display
-
-  // v2 fields
-  maxMembers: number;           // 3, 4, 7, or 15
-  requiresApproval: boolean;    // true = private, false = public
+  memberCount: number;
+  maxMembers: number;
+  requiresApproval: boolean;
   pendingRequests: PendingRequest[];
-
-  // Denormalized preview
   lastMessageAt?: Timestamp | null;
   lastMessagePreview?: string;
 }
 
-// ------------------------------------------------------------
-// Message document: chatRooms/{roomId}/messages/{messageId}
-// ------------------------------------------------------------
 export type ChatMessageType = 'text' | 'system' | 'file';
 
 export interface ChatAttachment {
@@ -79,7 +58,7 @@ export interface ChatMessage {
   type: ChatMessageType;
   attachments?: ChatAttachment[];
   createdAt: Timestamp | null;
-  expiresAt: Timestamp | null;  // Firestore TTL
+  expiresAt: Timestamp | null;
 }
 
 export interface ChatMessageInput {
@@ -91,9 +70,6 @@ export interface ChatMessageInput {
   attachments?: ChatAttachment[];
 }
 
-// ------------------------------------------------------------
-// Presence: chatPresence/{roomId}_{userId}
-// ------------------------------------------------------------
 export type PresenceState = 'online' | 'away';
 
 export interface ChatPresence {
@@ -105,9 +81,38 @@ export interface ChatPresence {
   lastSeen: Timestamp | null;
 }
 
-// ------------------------------------------------------------
-// LiveKit token response
-// ------------------------------------------------------------
+// v3 — Shared documents
+export type SharedDocSource = 'upload' | 'drive' | 'dropbox' | 'youtube' | 'link';
+export type SharedDocKind = 'pdf' | 'image' | 'video' | 'embed' | 'download';
+
+export interface SharedDocument {
+  id: string;
+  roomId: string;
+  sharedBy: string;
+  sharedByName: string;
+  sharedAt: Timestamp | null;
+  source: SharedDocSource;
+  kind: SharedDocKind;
+  title: string;
+  mimeType?: string;
+  fileSize?: number;
+  originalUrl?: string;
+  embedUrl: string;
+  downloadUrl?: string;
+  isActive: boolean;
+}
+
+export interface SharedDocumentInput {
+  source: SharedDocSource;
+  kind: SharedDocKind;
+  title: string;
+  mimeType?: string;
+  fileSize?: number;
+  originalUrl?: string;
+  embedUrl: string;
+  downloadUrl?: string;
+}
+
 export interface LiveKitTokenResponse {
   token: string;
   url: string;
@@ -115,19 +120,14 @@ export interface LiveKitTokenResponse {
   identity: string;
 }
 
-// ------------------------------------------------------------
-// Constants
-// ------------------------------------------------------------
-export const MAX_ROOM_MEMBERS = 15;          // Absolute ceiling
-export const MIN_ROOM_MEMBERS = 2;           // Absolute floor
+export const MAX_ROOM_MEMBERS = 15;
+export const MIN_ROOM_MEMBERS = 2;
 export const ALLOWED_MAX_MEMBERS = [3, 4, 7, 15] as const;
 export const MAX_MESSAGE_LENGTH = 2000;
 export const MAX_REQUEST_MESSAGE_LENGTH = 200;
-export const CHAT_TTL_MS = 1000 * 60 * 60 * 24 * 182; // ~6 months
+export const MAX_SHARED_FILE_SIZE = 10 * 1024 * 1024;
+export const CHAT_TTL_MS = 1000 * 60 * 60 * 24 * 182;
 
-// ------------------------------------------------------------
-// Helpers
-// ------------------------------------------------------------
 export function presenceDocId(roomId: string, userId: string): string {
   return `${roomId}_${userId}`;
 }
@@ -168,7 +168,6 @@ export function getPendingCount(room: ChatRoom | null): number {
   return (room.pendingRequests ?? []).length;
 }
 
-// Backward compatibility — old rooms without new fields
 export function normalizeRoom(raw: any): ChatRoom {
   return {
     ...raw,
@@ -176,4 +175,12 @@ export function normalizeRoom(raw: any): ChatRoom {
     requiresApproval: raw.requiresApproval ?? false,
     pendingRequests: raw.pendingRequests ?? [],
   };
+}
+
+export function formatFileSize(bytes: number | undefined): string {
+  if (!bytes || bytes <= 0) return '';
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${Math.round(kb)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(1)} MB`;
 }
