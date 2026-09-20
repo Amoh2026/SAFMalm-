@@ -3,13 +3,18 @@
 // ============================================================
 // useChatRooms — real-time subscription to all chat rooms
 // ============================================================
+// v2 — filters rooms by visibility rules:
+//       - owner always sees own rooms
+//       - public rooms always visible
+//       - private rooms visible when: owner active OR current occupant
+// ============================================================
 
 import { useEffect, useState } from 'react';
 import { subscribeRooms } from '@/lib/firebase/chat';
-import type { ChatRoom } from '@/types/chat';
+import { canSeeRoom, type ChatRoom } from '@/types/chat';
 
-export function useChatRooms() {
-  const [rooms, setRooms] = useState<ChatRoom[]>([]);
+export function useChatRooms(currentUserId?: string) {
+  const [allRooms, setAllRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +22,7 @@ export function useChatRooms() {
     let unsub: (() => void) | undefined;
     try {
       unsub = subscribeRooms((rows) => {
-        setRooms(rows);
+        setAllRooms(rows);
         setLoading(false);
       });
     } catch (err: any) {
@@ -29,6 +34,9 @@ export function useChatRooms() {
       if (unsub) unsub();
     };
   }, []);
+
+  // Filter by visibility rules
+  const rooms = allRooms.filter((r) => canSeeRoom(r, currentUserId));
 
   return { rooms, loading, error };
 }

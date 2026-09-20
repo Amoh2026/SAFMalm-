@@ -1,10 +1,14 @@
 // ============================================================
 // Chat Types — SAFiMalmo
-// v3 — added SharedDocument for in-call document sharing
+// ============================================================
+// v4 — added room session tracking for private room visibility
 // ============================================================
 
 import { Timestamp } from 'firebase/firestore';
 
+// ------------------------------------------------------------
+// Chat member
+// ------------------------------------------------------------
 export interface ChatMember {
   id: string;
   name: string;
@@ -12,6 +16,9 @@ export interface ChatMember {
   joinedAt: number;
 }
 
+// ------------------------------------------------------------
+// Pending join request
+// ------------------------------------------------------------
 export interface PendingRequest {
   id: string;
   name: string;
@@ -20,6 +27,9 @@ export interface PendingRequest {
   message?: string;
 }
 
+// ------------------------------------------------------------
+// Chat room
+// ------------------------------------------------------------
 export type RoomType = 'public' | 'private';
 
 export interface ChatRoom {
@@ -37,8 +47,16 @@ export interface ChatRoom {
   pendingRequests: PendingRequest[];
   lastMessageAt?: Timestamp | null;
   lastMessagePreview?: string;
+
+  // v4 — session tracking (for private room visibility)
+  ownerIsActive?: boolean;           // owner is on the room page
+  ownerLastActiveAt?: Timestamp | null; // heartbeat for stale detection
+  sessionOccupants?: string[];       // UIDs currently viewing the room
 }
 
+// ------------------------------------------------------------
+// Chat message
+// ------------------------------------------------------------
 export type ChatMessageType = 'text' | 'system' | 'file';
 
 export interface ChatAttachment {
@@ -70,6 +88,9 @@ export interface ChatMessageInput {
   attachments?: ChatAttachment[];
 }
 
+// ------------------------------------------------------------
+// Presence
+// ------------------------------------------------------------
 export type PresenceState = 'online' | 'away';
 
 export interface ChatPresence {
@@ -81,7 +102,9 @@ export interface ChatPresence {
   lastSeen: Timestamp | null;
 }
 
+// ------------------------------------------------------------
 // v3 — Shared documents
+// ------------------------------------------------------------
 export type SharedDocSource = 'upload' | 'drive' | 'dropbox' | 'youtube' | 'link';
 export type SharedDocKind = 'pdf' | 'image' | 'video' | 'embed' | 'download';
 
@@ -113,6 +136,9 @@ export interface SharedDocumentInput {
   downloadUrl?: string;
 }
 
+// ------------------------------------------------------------
+// LiveKit token
+// ------------------------------------------------------------
 export interface LiveKitTokenResponse {
   token: string;
   url: string;
@@ -120,6 +146,9 @@ export interface LiveKitTokenResponse {
   identity: string;
 }
 
+// ------------------------------------------------------------
+// Constants
+// ------------------------------------------------------------
 export const MAX_ROOM_MEMBERS = 15;
 export const MIN_ROOM_MEMBERS = 2;
 export const ALLOWED_MAX_MEMBERS = [3, 4, 7, 15] as const;
@@ -128,6 +157,13 @@ export const MAX_REQUEST_MESSAGE_LENGTH = 200;
 export const MAX_SHARED_FILE_SIZE = 10 * 1024 * 1024;
 export const CHAT_TTL_MS = 1000 * 60 * 60 * 24 * 182;
 
+// v4 — session freshness
+export const SESSION_HEARTBEAT_MS = 30_000;      // 30s
+export const SESSION_STALE_MS = 90_000;          // 90s
+
+// ------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------
 export function presenceDocId(roomId: string, userId: string): string {
   return `${roomId}_${userId}`;
 }
@@ -174,6 +210,9 @@ export function normalizeRoom(raw: any): ChatRoom {
     maxMembers: raw.maxMembers ?? MAX_ROOM_MEMBERS,
     requiresApproval: raw.requiresApproval ?? false,
     pendingRequests: raw.pendingRequests ?? [],
+    ownerIsActive: raw.ownerIsActive ?? false,
+    ownerLastActiveAt: raw.ownerLastActiveAt ?? null,
+    sessionOccupants: raw.sessionOccupants ?? [],
   };
 }
 
@@ -183,4 +222,84 @@ export function formatFileSize(bytes: number | undefined): string {
   if (kb < 1024) return `${Math.round(kb)} KB`;
   const mb = kb / 1024;
   return `${mb.toFixed(1)} MB`;
+}
+
+// ------------------------------------------------------------
+// v4 — Room visibility logic
+// ------------------------------------------------------------
+
+export type RoomStatus = 'open' | 'locked' | 'dormant' | 'public';
+
+/**
+ * Compute the "status" of a room from the viewer's perspective.
+ */
+export function getRoomStatus(room: ChatRoom | null): RoomStatus {
+  if (!room) return 'public';
+  if (!room.requiresApproval) return 'public';
+  if (isOwnerActive(room)) return 'open';
+  if ((room.sessionOccupants?.length ?? 0) > 0) return 'locked';
+  return 'dormant';
+}
+
+/**
+ * Is the owner of this room currently active?
+ */
+export function isOwnerActive(room: ChatRoom | null): boolean {
+  if (!room) return false;
+  if (!room.ownerIsActive) return false;
+  // Safety: if the heartbeat is stale, treat as inactive
+  const last = room.ownerLastActiveAt;
+  if (!last) return false;
+  const ms = typeof (last as any)?.toMillis === 'function'
+    ? (last as any).toMillis()
+    : 0;
+  if (!ms) return false;
+  return Date.now() - ms < SESSION_STALE_MS;
+}
+
+/**
+ * Can the given user see this room in the list?
+ */
+export function canSeeRoom(room: ChatRoom | null, currentUserId: string | undefined): boolean {
+  if (!room || !currentUserId) return false;
+
+  // 1. Owner always sees their own rooms
+  if (room.createdBy === currentUserId) return true;
+
+  // 2. Public rooms: always visible
+  if (!room.requiresApproval) return true;
+
+  // 3. Owner is active: visible to all
+  if (isOwnerActive(room)) return true;
+
+  // 4. Owner away: visible only to current session occupants
+  return (room.sessionOccupants ?? []).includes(currentUserId);
+}
+
+export type RoomAccess =
+  | { allowed: true }
+  | { allowed: false; reason: 'locked' | 'hidden' | 'pending' | 'not-member' };
+
+/**
+ * Can the given user enter this room?
+ */
+export function canEnterRoom(room: ChatRoom | null, currentUserId: string | undefined): RoomAccess {
+  if (!room || !currentUserId) return { allowed: false, reason: 'hidden' };
+
+  // Owner: always allowed
+  if (room.createdBy === currentUserId) return { allowed: true };
+
+  // Public rooms: always allowed
+  if (!room.requiresApproval) return { allowed: true };
+
+  // Owner is active: treat like a private room request flow
+  if (isOwnerActive(room)) return { allowed: true };
+
+  // Owner away: only current session occupants can enter
+  if ((room.sessionOccupants ?? []).includes(currentUserId)) {
+    return { allowed: true };
+  }
+
+  // Otherwise: locked / hidden
+  return { allowed: false, reason: 'locked' };
 }

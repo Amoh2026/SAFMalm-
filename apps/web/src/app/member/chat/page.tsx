@@ -2,7 +2,7 @@
 
 // ============================================================
 // /member/chat — room list page
-// v2 — passes currentUserId to RoomCard (for owner badge)
+// v3 — filters rooms by visibility rules
 // ============================================================
 
 import { useEffect } from 'react';
@@ -18,7 +18,7 @@ export default function ChatListPage() {
   const router = useRouter();
   const { user, loading: authLoading, isApproved, isAdmin } = useAuth();
   const { t } = useLanguage();
-  const { rooms, loading, error } = useChatRooms();
+  const { rooms, loading, error } = useChatRooms(user?.id);
 
   useEffect(() => {
     if (authLoading) return;

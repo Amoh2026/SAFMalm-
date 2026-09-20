@@ -120,15 +120,15 @@ export function RoomHeader({
           </button>
         )}
 
-        {isMember && (
-          <button
-            onClick={handleLeave}
-            className="p-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition"
-            title={t('chat.leave')}
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        )}
+       {isMember && !isCreator && (
+  <button
+    onClick={handleLeave}
+    className="p-2 rounded-lg bg-white border border-gray-300 ..."
+    title={t('chat.leave')}
+  >
+    <LogOut className="h-4 w-4" />
+  </button>
+)}
 
         {isCreator && (
           <button

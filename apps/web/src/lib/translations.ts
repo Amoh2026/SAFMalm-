@@ -690,6 +690,13 @@ export const translations: Translations = {
       stopSharingConfirm: "Sluta dela detta dokument?",
       cannotPreview: "Denna fil kan inte förhandsvisas här.",
       openFile: "Öppna fil",
+            // v4 — room visibility
+      statusOpen: "Öppen",
+      statusLocked: "Låst",
+      statusDormant: "Inaktiv",
+      roomLocked: "Rummet är låst",
+      roomLockedDesc: "Ägaren är inte tillgänglig just nu. Rummet är inte tillgängligt.",
+      roomNotAvailable: "Ej tillgängligt",
     },
   },
   // ============================================================
@@ -1371,6 +1378,13 @@ export const translations: Translations = {
       stopSharingConfirm: "Stop sharing this document?",
       cannotPreview: "This file cannot be previewed here.",
       openFile: "Open file",
+            // v4 — room visibility
+      statusOpen: "Open",
+      statusLocked: "Locked",
+      statusDormant: "Inactive",
+      roomLocked: "Room is locked",
+      roomLockedDesc: "The owner is away right now. The room is not available.",
+      roomNotAvailable: "Not available",
     },
   },
 
@@ -2058,6 +2072,13 @@ export const translations: Translations = {
       stopSharingConfirm: "Arrêter le partage de ce document ?",
       cannotPreview: "Ce fichier ne peut pas être prévisualisé ici.",
       openFile: "Ouvrir le fichier",
+            // v4 — room visibility
+      statusOpen: "Ouvert",
+      statusLocked: "Verrouillé",
+      statusDormant: "Inactif",
+      roomLocked: "Le salon est verrouillé",
+      roomLockedDesc: "Le propriétaire est absent. Le salon n'est pas disponible.",
+      roomNotAvailable: "Non disponible",
     },
   },
 
@@ -2743,6 +2764,13 @@ export const translations: Translations = {
       stopSharingConfirm: "إيقاف مشاركة هذا المستند؟",
       cannotPreview: "لا يمكن معاينة هذا الملف هنا.",
       openFile: "فتح الملف",
+            // v4 — room visibility
+      statusOpen: "مفتوح",
+      statusLocked: "مقفل",
+      statusDormant: "غير نشط",
+      roomLocked: "الغرفة مقفلة",
+      roomLockedDesc: "المالك غائب حالياً. الغرفة غير متاحة.",
+      roomNotAvailable: "غير متاح",
     },
   },
 };
